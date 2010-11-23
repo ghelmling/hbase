@@ -62,7 +62,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
 
   // Overriden RegionObserver methods
   @Override
-  public Get preGet(CoprocessorEnvironment e, Get get) {
+  public Get preGet(RegionCoprocessorEnvironment e, Get get) {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE)) {
       hadPreGet = true;
@@ -73,7 +73,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public List<KeyValue> postGet(CoprocessorEnvironment e, Get get,
+  public List<KeyValue> postGet(RegionCoprocessorEnvironment e, Get get,
       List<KeyValue> results) {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -100,7 +100,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public Map<byte[], List<KeyValue>> prePut(CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> prePut(RegionCoprocessorEnvironment e,
       Map<byte[], List<KeyValue>> familyMap) {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -125,7 +125,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public void postPut(CoprocessorEnvironment e,
+  public void postPut(RegionCoprocessorEnvironment e,
       Map<byte[], List<KeyValue>> familyMap) {
     List<KeyValue> kvs = familyMap.get(TestRegionObserverInterface.A);
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
@@ -149,7 +149,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public Map<byte[], List<KeyValue>> preDelete(CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> preDelete(RegionCoprocessorEnvironment e,
       Map<byte[], List<KeyValue>> familyMap) {
     if (beforeDelete && e.getRegion().getTableDesc().getName().equals(
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -159,7 +159,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public void postDelete(CoprocessorEnvironment e,
+  public void postDelete(RegionCoprocessorEnvironment e,
       Map<byte[], List<KeyValue>> familyMap) {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -169,7 +169,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public void preGetClosestRowBefore(final CoprocessorEnvironment e,
+  public void preGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte[] row, final byte[] family) {
     if (beforeDelete && e.getRegion().getTableDesc().getName().equals(
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -178,7 +178,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public Result postGetClosestRowBefore(final CoprocessorEnvironment e,
+  public Result postGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte[] row, final byte[] family, Result result) {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE)) {
@@ -188,44 +188,44 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public Scan preScannerOpen(CoprocessorEnvironment e, Scan scan) {
+  public Scan preScannerOpen(RegionCoprocessorEnvironment e, Scan scan) {
     // not tested -- need to go through the RS to get here
     return scan;
   }
 
   @Override
-  public void postScannerOpen(CoprocessorEnvironment e, Scan scan,
+  public void postScannerOpen(RegionCoprocessorEnvironment e, Scan scan,
       long scannerId) {
     // not tested -- need to go through the RS to get here
   }
 
   @Override
-  public void preScannerNext(final CoprocessorEnvironment e,
+  public void preScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId) {
     // not tested -- need to go through the RS to get here
   }
 
   @Override
-  public List<KeyValue> postScannerNext(final CoprocessorEnvironment e,
+  public List<KeyValue> postScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId, List<KeyValue> results) {
     // not tested -- need to go through the RS to get here
     return results;
   }
 
   @Override
-  public void preScannerClose(final CoprocessorEnvironment e,
+  public void preScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId) {
     // not tested -- need to go through the RS to get here
   }
 
   @Override
-  public void postScannerClose(final CoprocessorEnvironment e,
+  public void postScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId) {
     // not tested -- need to go through the RS to get here
   }
 
   @Override
-  public Increment preIncrement(CoprocessorEnvironment e, Increment increment)
+  public Increment preIncrement(RegionCoprocessorEnvironment e, Increment increment)
       throws IOException {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE_2)) {
@@ -235,7 +235,7 @@ public class SimpleRegionObserver extends BaseRegionObserverCoprocessor {
   }
 
   @Override
-  public Result postIncrement(CoprocessorEnvironment e, Increment increment,
+  public Result postIncrement(RegionCoprocessorEnvironment e, Increment increment,
       Result result) throws IOException {
     if (Arrays.equals(e.getRegion().getTableDesc().getName(),
         TestRegionObserverInterface.TEST_TABLE_2)) {

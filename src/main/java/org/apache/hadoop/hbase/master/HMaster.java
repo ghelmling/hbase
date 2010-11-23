@@ -168,6 +168,8 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   private Thread catalogJanitorChore;
   private LogCleaner logCleaner;
 
+  private MasterCoprocessorHost cpHost;
+
   /**
    * Initializes the HMaster. The steps are as follows:
    * <p>
@@ -364,6 +366,9 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       ", sessionid=0x" +
       Long.toHexString(this.zooKeeper.getZooKeeper().getSessionId()) +
       ", cluster-up flag was=" + wasUp);
+
+    // initialize master side coprocessors before we start handling requests
+    this.cpHost = new MasterCoprocessorHost(this, this.conf);
 
     // start up all service threads.
     startServiceThreads();
@@ -667,6 +672,16 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       if (!this.serverManager.getDeadServers().isEmpty()) {
         LOG.debug("Not running balancer because dead regionserver processing");
       }
+
+      if (this.cpHost != null) {
+        try {
+          this.cpHost.preBalance();
+        } catch (IOException ioe) {
+          LOG.error("Error invoking master coprocessor preBalance()", ioe);
+          return false;
+        }
+      }
+
       Map<HServerInfo, List<HRegionInfo>> assignments =
         this.assignmentManager.getAssignments();
       // Returned Map from AM does not include mention of servers w/o assignments.
@@ -684,6 +699,14 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
           this.assignmentManager.balance(plan);
         }
       }
+      if (this.cpHost != null) {
+        try {
+          this.cpHost.postBalance();
+        } catch (IOException ioe) {
+          // balancing already succeeded so don't change the result
+          LOG.error("Error invoking master coprocessor postBalance()", ioe);
+        }
+      }
     }
     return true;
   }
@@ -691,8 +714,18 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   @Override
   public boolean balanceSwitch(final boolean b) {
     boolean oldValue = this.balanceSwitch;
-    this.balanceSwitch = b;
-    LOG.info("Balance=" + b);
+    try {
+      if (this.cpHost != null) {
+        this.cpHost.preBalanceSwitch(b);
+      }
+      this.balanceSwitch = b;
+      LOG.info("Balance=" + b);
+      if (this.cpHost != null) {
+        this.cpHost.postBalanceSwitch(b);
+      }
+    } catch (IOException ioe) {
+      LOG.warn("Error flipping balance switch", ioe);
+    }
     return oldValue;
   }
 
@@ -705,8 +738,15 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       throw new UnknownRegionException(Bytes.toString(encodedRegionName));
     HServerInfo dest =
       this.serverManager.getServerInfo(new String(destServerName));
+    
+    if (this.cpHost != null) {
+      this.cpHost.preMove(p.getFirst(), p.getSecond(), dest);
+    }
     RegionPlan rp = new RegionPlan(p.getFirst(), p.getSecond(), dest);
     this.assignmentManager.balance(rp);
+    if (this.cpHost != null) {
+      this.cpHost.postMove(p.getFirst(), p.getSecond(), dest);
+    }
   }
 
   public void createTable(HTableDescriptor desc, byte [][] splitKeys)
@@ -719,6 +759,9 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   throws IOException {
     if (!isMasterRunning()) {
       throw new MasterNotRunningException();
+    }
+    if (cpHost != null) {
+      cpHost.preCreateTable(desc, splitKeys);
     }
     HRegionInfo [] newRegions = null;
     if(splitKeys == null || splitKeys.length == 0) {
@@ -784,6 +827,10 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
         }
       }
     }
+
+    if (cpHost != null) {
+      cpHost.postCreateTable(newRegions, sync);
+    }
   }
 
   private static boolean isCatalogTable(final byte [] tableName) {
@@ -792,32 +839,68 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   }
 
   public void deleteTable(final byte [] tableName) throws IOException {
+    if (cpHost != null) {
+      cpHost.preDeleteTable(tableName);
+    }
     new DeleteTableHandler(tableName, this, this).process();
+    if (cpHost != null) {
+      cpHost.postDeleteTable(tableName);
+    }
   }
 
   public void addColumn(byte [] tableName, HColumnDescriptor column)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preAddColumn(tableName, column);
+    }
     new TableAddFamilyHandler(tableName, column, this, this).process();
+    if (cpHost != null) {
+      cpHost.postAddColumn(tableName, column);
+    }
   }
 
   public void modifyColumn(byte [] tableName, HColumnDescriptor descriptor)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preModifyColumn(tableName, descriptor);
+    }
     new TableModifyFamilyHandler(tableName, descriptor, this, this).process();
+    if (cpHost != null) {
+      cpHost.postModifyColumn(tableName, descriptor);
+    }
   }
 
   public void deleteColumn(final byte [] tableName, final byte [] c)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preDeleteColumn(tableName, c);
+    }
     new TableDeleteFamilyHandler(tableName, c, this, this).process();
+    if (cpHost != null) {
+      cpHost.postDeleteColumn(tableName, c);
+    }
   }
 
   public void enableTable(final byte [] tableName) throws IOException {
+    if (cpHost != null) {
+      cpHost.preEnableTable(tableName);
+    }
     this.executorService.submit(new EnableTableHandler(this, tableName,
       catalogTracker, assignmentManager));
+    if (cpHost != null) {
+      cpHost.postEnableTable(tableName);
+    }
   }
 
   public void disableTable(final byte [] tableName) throws IOException {
+    if (cpHost != null) {
+      cpHost.preDisableTable(tableName);
+    }
     this.executorService.submit(new DisableTableHandler(this, tableName,
       catalogTracker, assignmentManager));
+    if (cpHost != null) {
+      cpHost.postDisableTable(tableName);
+    }
   }
 
   /**
@@ -860,7 +943,13 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   @Override
   public void modifyTable(final byte[] tableName, HTableDescriptor htd)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preModifyTable(tableName, htd);
+    }
     this.executorService.submit(new ModifyTableHandler(tableName, htd, this, this));
+    if (cpHost != null) {
+      cpHost.postModifyTable(tableName, htd);
+    }
   }
 
   @Override
@@ -926,6 +1015,13 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
 
   @Override
   public void shutdown() {
+    if (cpHost != null) {
+      try {
+        cpHost.preShutdown();
+      } catch (IOException ioe) {
+        LOG.error("Error call master coprocessor preShutdown()", ioe);
+      }
+    }
     this.serverManager.shutdownCluster();
     try {
       this.clusterStatusTracker.setClusterDown();
@@ -936,6 +1032,13 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
 
   @Override
   public void stopMaster() {
+    if (cpHost != null) {
+      try {
+        cpHost.preStopMaster();
+      } catch (IOException ioe) {
+        LOG.error("Error call master coprocessor preStopMaster()", ioe);
+      }
+    }
     stop("Stopped by " + Thread.currentThread().getName());
   }
 

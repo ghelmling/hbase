@@ -70,75 +70,75 @@ public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
   public void postCompact(CoprocessorEnvironment e, boolean willSplit) { }
 
   @Override
-  public void preGetClosestRowBefore(final CoprocessorEnvironment e,
+  public void preGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family)
     throws IOException {
   }
 
   @Override
-  public Result postGetClosestRowBefore(final CoprocessorEnvironment e,
+  public Result postGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       byte[] row, byte[] family, final Result result)
     throws IOException {
     return result;
   }
 
   @Override
-  public Get preGet(final CoprocessorEnvironment e, final Get get)
+  public Get preGet(final RegionCoprocessorEnvironment e, final Get get)
     throws IOException {
     return get;
   }
 
   @Override
-  public List<KeyValue> postGet(final CoprocessorEnvironment e, final Get get,
+  public List<KeyValue> postGet(final RegionCoprocessorEnvironment e, final Get get,
       List<KeyValue> results) throws IOException {
     return results;
   }
 
   @Override
-  public Get preExists(final CoprocessorEnvironment e, final Get get)
+  public Get preExists(final RegionCoprocessorEnvironment e, final Get get)
       throws IOException {
     return get;
   }
 
   @Override
-  public boolean postExists(final CoprocessorEnvironment e,
+  public boolean postExists(final RegionCoprocessorEnvironment e,
       final Get get, boolean exists)
       throws IOException {
     return exists;
   }
 
   @Override
-  public Map<byte[], List<KeyValue>> prePut(final CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> prePut(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap) throws IOException {
     return familyMap;
   }
 
   @Override
-  public void postPut(final CoprocessorEnvironment e,
+  public void postPut(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap)
     throws IOException {
   }
 
   @Override
-  public Map<byte[], List<KeyValue>> preDelete(final CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> preDelete(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap) throws IOException {
     return familyMap;
   }
 
   @Override
-  public void postDelete(CoprocessorEnvironment e,
+  public void postDelete(final RegionCoprocessorEnvironment e,
       Map<byte[], List<KeyValue>> familyMap) throws IOException {
   }
 
   @Override
-  public Put preCheckAndPut(final CoprocessorEnvironment e,
+  public Put preCheckAndPut(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Put put) throws IOException {
     return put;
   }
 
   @Override
-  public boolean postCheckAndPut(final CoprocessorEnvironment e,
+  public boolean postCheckAndPut(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Put put, final boolean result)
     throws IOException {
@@ -146,7 +146,7 @@ public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
   }
 
   @Override
-  public Delete preCheckAndDelete(final CoprocessorEnvironment e,
+  public Delete preCheckAndDelete(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Delete delete)
     throws IOException {
@@ -154,7 +154,7 @@ public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
   }
 
   @Override
-  public boolean postCheckAndDelete(final CoprocessorEnvironment e,
+  public boolean postCheckAndDelete(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Delete delete, final boolean result)
     throws IOException {
@@ -162,14 +162,14 @@ public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
   }
 
   @Override
-  public long preIncrementColumnValue(final CoprocessorEnvironment e,
+  public long preIncrementColumnValue(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final long amount, final boolean writeToWAL) throws IOException {
     return amount;
   }
 
   @Override
-  public long postIncrementColumnValue(final CoprocessorEnvironment e,
+  public long postIncrementColumnValue(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final long amount, final boolean writeToWAL, long result)
   throws IOException {
@@ -177,49 +177,49 @@ public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
   }
 
   @Override
-  public Increment preIncrement(final CoprocessorEnvironment e,
+  public Increment preIncrement(final RegionCoprocessorEnvironment e,
       final Increment increment)
   throws IOException {
     return increment;
   }
 
   @Override
-  public Result postIncrement(final CoprocessorEnvironment e,
+  public Result postIncrement(final RegionCoprocessorEnvironment e,
       final Increment increment,
       final Result result) throws IOException {
     return result;
   }
 
   @Override
-  public Scan preScannerOpen(final CoprocessorEnvironment e, final Scan scan)
+  public Scan preScannerOpen(final RegionCoprocessorEnvironment e, final Scan scan)
     throws IOException {
     return scan;
   }
 
   @Override
-  public void postScannerOpen(final CoprocessorEnvironment e,
+  public void postScannerOpen(final RegionCoprocessorEnvironment e,
       final Scan scan,
       final long scannerId) throws IOException { }
 
   @Override
-  public void preScannerNext(final CoprocessorEnvironment e,
+  public void preScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId) throws IOException {
   }
 
   @Override
-  public List<KeyValue> postScannerNext(final CoprocessorEnvironment e,
+  public List<KeyValue> postScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId, final List<KeyValue> results)
       throws IOException {
     return results;
   }
 
   @Override
-  public void preScannerClose(final CoprocessorEnvironment e,
+  public void preScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId)
     throws IOException { }
 
   @Override
-  public void postScannerClose(final CoprocessorEnvironment e,
+  public void postScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId)
     throws IOException { }
 }

@@ -74,7 +74,6 @@ import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.RowLock;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.coprocessor.CoprocessorException;
 import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.filter.IncompatibleFilterException;
 import org.apache.hadoop.hbase.io.HeapSize;
@@ -82,7 +81,6 @@ import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.io.hfile.BlockCache;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
 import org.apache.hadoop.hbase.ipc.HBaseRPC;
-import org.apache.hadoop.hbase.ipc.HRegionInterface;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
@@ -249,7 +247,7 @@ public class HRegion implements HeapSize { // , Writable{
       new ReadWriteConsistencyControl();
 
   // Coprocessor host
-  private CoprocessorHost coprocessorHost;
+  private RegionCoprocessorHost coprocessorHost;
 
   /**
    * Name of the region info file that resides just under the region directory.
@@ -320,7 +318,7 @@ public class HRegion implements HeapSize { // , Writable{
     // don't initialize coprocessors if not running within a regionserver
     // TODO: revisit if coprocessors should load in other cases
     if (rsServices != null) {
-      this.coprocessorHost = new CoprocessorHost(this, rsServices, conf);
+      this.coprocessorHost = new RegionCoprocessorHost(this, rsServices, conf);
     }
     if (LOG.isDebugEnabled()) {
       // Write out region name as string and its encoded name.
@@ -3503,12 +3501,12 @@ public class HRegion implements HeapSize { // , Writable{
   }
 
   /** @return the coprocessor host */
-  public CoprocessorHost getCoprocessorHost() {
+  public RegionCoprocessorHost getCoprocessorHost() {
     return coprocessorHost;
   }
 
   /** @param coprocessorHost the new coprocessor host */
-  public void setCoprocessorHost(final CoprocessorHost coprocessorHost) {
+  public void setCoprocessorHost(final RegionCoprocessorHost coprocessorHost) {
     this.coprocessorHost = coprocessorHost;
   }
 

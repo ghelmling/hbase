@@ -42,7 +42,7 @@ public interface RegionObserver {
    * @param family the family
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void preGetClosestRowBefore(final CoprocessorEnvironment e,
+  public void preGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family)
     throws IOException;
 
@@ -55,7 +55,7 @@ public interface RegionObserver {
    * @return the possible tranformed result set to return to the client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Result postGetClosestRowBefore(final CoprocessorEnvironment e,
+  public Result postGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final Result result)
     throws IOException;
 
@@ -66,7 +66,7 @@ public interface RegionObserver {
    * @return the possibly transformed Get object by coprocessor
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Get preGet(final CoprocessorEnvironment e, final Get get)
+  public Get preGet(final RegionCoprocessorEnvironment e, final Get get)
     throws IOException;
 
   /**
@@ -77,7 +77,7 @@ public interface RegionObserver {
    * @return the possibly transformed result list to return to client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public List<KeyValue> postGet(final CoprocessorEnvironment e, final Get get,
+  public List<KeyValue> postGet(final RegionCoprocessorEnvironment e, final Get get,
       final List<KeyValue> results)
     throws IOException;
 
@@ -88,7 +88,7 @@ public interface RegionObserver {
    * @return the possibly transformed Get object by coprocessor
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Get preExists(final CoprocessorEnvironment e, final Get get)
+  public Get preExists(final RegionCoprocessorEnvironment e, final Get get)
     throws IOException;
 
   /**
@@ -99,7 +99,7 @@ public interface RegionObserver {
    * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public boolean postExists(final CoprocessorEnvironment e, final Get get,
+  public boolean postExists(final RegionCoprocessorEnvironment e, final Get get,
       final boolean exists)
     throws IOException;
 
@@ -110,7 +110,7 @@ public interface RegionObserver {
    * @return the possibly transformed map to actually use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Map<byte[], List<KeyValue>> prePut(final CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> prePut(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap)
     throws IOException;
 
@@ -120,7 +120,7 @@ public interface RegionObserver {
    * @param familyMap map of family to edits for the given family.
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void postPut(final CoprocessorEnvironment e, final Map<byte[],
+  public void postPut(final RegionCoprocessorEnvironment e, final Map<byte[],
       List<KeyValue>> familyMap)
     throws IOException;
 
@@ -131,7 +131,7 @@ public interface RegionObserver {
    * @return the possibly transformed map to actually use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Map<byte[], List<KeyValue>> preDelete(final CoprocessorEnvironment e,
+  public Map<byte[], List<KeyValue>> preDelete(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap)
     throws IOException;
 
@@ -141,7 +141,7 @@ public interface RegionObserver {
    * @param familyMap map of family to edits for the given family.
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void postDelete(final CoprocessorEnvironment e,
+  public void postDelete(final RegionCoprocessorEnvironment e,
       final Map<byte[], List<KeyValue>> familyMap)
     throws IOException;
 
@@ -156,7 +156,7 @@ public interface RegionObserver {
    * @return the possibly transformed map to actually use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Put preCheckAndPut(final CoprocessorEnvironment e,
+  public Put preCheckAndPut(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Put put)
     throws IOException;
@@ -173,7 +173,7 @@ public interface RegionObserver {
    * @return the possibly transformed value to return to client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public boolean postCheckAndPut(final CoprocessorEnvironment e,
+  public boolean postCheckAndPut(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Put put, final boolean result)
     throws IOException;
@@ -189,7 +189,7 @@ public interface RegionObserver {
    * @return the possibly transformed map to actually use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Delete preCheckAndDelete(final CoprocessorEnvironment e,
+  public Delete preCheckAndDelete(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Delete delete)
     throws IOException;
@@ -206,7 +206,7 @@ public interface RegionObserver {
    * @return the possibly transformed value to return to client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public boolean postCheckAndDelete(final CoprocessorEnvironment e,
+  public boolean postCheckAndDelete(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final byte [] value, final Delete delete, final boolean result)
     throws IOException;
@@ -222,7 +222,7 @@ public interface RegionObserver {
    * @return new amount to increment
    * @throws IOException if an error occurred on the coprocessor
    */
-  public long preIncrementColumnValue(final CoprocessorEnvironment e,
+  public long preIncrementColumnValue(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final long amount, final boolean writeToWAL)
     throws IOException;
@@ -239,7 +239,7 @@ public interface RegionObserver {
    * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public long postIncrementColumnValue(final CoprocessorEnvironment e,
+  public long postIncrementColumnValue(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
       final long amount, final boolean writeToWAL, final long result)
     throws IOException;
@@ -248,11 +248,10 @@ public interface RegionObserver {
    * Called before incrementColumnValue
    * @param e the environment provided by the region server
    * @param increment increment object
-   * @param writeToWAL whether to write the increment to the WAL
    * @return new Increment instance
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Increment preIncrement(final CoprocessorEnvironment e,
+  public Increment preIncrement(final RegionCoprocessorEnvironment e,
       final Increment increment)
     throws IOException;
 
@@ -260,12 +259,11 @@ public interface RegionObserver {
    * Called after increment
    * @param e the environment provided by the region server
    * @param increment increment object
-   * @param writeToWAL whether to write the increment to the WAL
    * @param result the result returned by increment
    * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Result postIncrement(final CoprocessorEnvironment e,
+  public Result postIncrement(final RegionCoprocessorEnvironment e,
       final Increment increment, final Result result)
     throws IOException;
 
@@ -276,7 +274,7 @@ public interface RegionObserver {
    * @return the possibly transformed Scan to actually use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Scan preScannerOpen(final CoprocessorEnvironment e, final Scan scan)
+  public Scan preScannerOpen(final RegionCoprocessorEnvironment e, final Scan scan)
     throws IOException;
 
   /**
@@ -286,7 +284,7 @@ public interface RegionObserver {
    * @param scannerId the scanner id allocated by the region server
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void postScannerOpen(final CoprocessorEnvironment e, final Scan scan,
+  public void postScannerOpen(final RegionCoprocessorEnvironment e, final Scan scan,
       final long scannerId)
     throws IOException;
 
@@ -294,11 +292,10 @@ public interface RegionObserver {
    * Called before the client asks for the next row on a scanner.
    * @param e the environment provided by the region server
    * @param scannerId the scanner id
-   * @param results the result set returned by the region server
    * @return the possibly transformed result set to actually return
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void preScannerNext(final CoprocessorEnvironment e,
+  public void preScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId)
     throws IOException;
 
@@ -310,7 +307,7 @@ public interface RegionObserver {
    * @return the possibly transformed result set to actually return
    * @throws IOException if an error occurred on the coprocessor
    */
-  public List<KeyValue> postScannerNext(final CoprocessorEnvironment e,
+  public List<KeyValue> postScannerNext(final RegionCoprocessorEnvironment e,
       final long scannerId, final List<KeyValue> results)
     throws IOException;
 
@@ -320,7 +317,7 @@ public interface RegionObserver {
    * @param scannerId the scanner id
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void preScannerClose(final CoprocessorEnvironment e,
+  public void preScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId)
     throws IOException;
 
@@ -330,7 +327,7 @@ public interface RegionObserver {
    * @param scannerId the scanner id
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void postScannerClose(final CoprocessorEnvironment e,
+  public void postScannerClose(final RegionCoprocessorEnvironment e,
       final long scannerId)
     throws IOException;
 }
