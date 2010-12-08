@@ -163,10 +163,10 @@
   </property>
   <property>
     <name>hbase.regionserver.handler.count</name>
-    <value>25</value>
+    <value>10</value>
     <description>Count of RPC Server instances spun up on RegionServers
     Same property is used by the Master for count of master handlers.
-    Default is 25.
+    Default is 10.
     </description>
   </property>
   <property>
@@ -275,7 +275,7 @@
     </description>
   </property>
   <property>
-    <name>hbase.master.balancer.period
+    <name>hbase.balancer.period
     </name>
     <value>300000</value>
     <description>Period at which the region balancer runs in the Master.
@@ -451,29 +451,13 @@
   </property>
   <property>
     <name>zookeeper.session.timeout</name>
-    <value>60000</value>
+    <value>180000</value>
     <description>ZooKeeper session timeout.
       HBase passes this to the zk quorum as suggested maximum time for a
       session.  See http://hadoop.apache.org/zookeeper/docs/current/zookeeperProgrammers.html#ch_zkSessions
       "The client sends a requested timeout, the server responds with the
       timeout that it can give the client. "
       In milliseconds.
-    </description>
-  </property>
-  <property>
-    <name>zookeeper.retries</name>
-    <value>5</value>
-    <description>How many times to retry connections to ZooKeeper. Used for
-      reading/writing root region location.  Used together with ${zookeeper.pause}
-      in an exponential backoff fashion when making queries to ZooKeeper.
-    </description>
-  </property>
-  <property>
-    <name>zookeeper.pause</name>
-    <value>2000</value>
-    <description>Sleep time between retries to ZooKeeper. In milliseconds. Used
-      together with ${zookeeper.retries} in an exponential backoff fashion when
-      making queries to ZooKeeper.
     </description>
   </property>
   <property>

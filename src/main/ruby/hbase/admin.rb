@@ -25,7 +25,10 @@ java_import org.apache.zookeeper.ZooKeeperMain
 java_import org.apache.hadoop.hbase.HColumnDescriptor
 java_import org.apache.hadoop.hbase.HTableDescriptor
 java_import org.apache.hadoop.hbase.HRegionInfo
+java_import org.apache.hadoop.hbase.util.Bytes
 java_import org.apache.zookeeper.ZooKeeper
+java_import org.apache.hadoop.hbase.io.hfile.Compression
+java_import org.apache.hadoop.hbase.regionserver.StoreFile
 
 # Wrapper for org.apache.hadoop.hbase.client.HBaseAdmin
 
@@ -73,17 +76,31 @@ module Hbase
     end
 
     #----------------------------------------------------------------------------------------------
+    # Requests a cluster balance
+    # Returns true if balancer ran
+    def balancer()
+      @admin.balancer()
+    end
+
+    #----------------------------------------------------------------------------------------------
+    # Enable/disable balancer
+    # Returns previous balancer switch setting.
+    def balance_switch(enableDisable)
+      @admin.balanceSwitch(java.lang.Boolean::valueOf(enableDisable))
+    end
+
+    #----------------------------------------------------------------------------------------------
     # Enables a table
     def enable(table_name)
       return if enabled?(table_name)
-      @admin.enableTableAsync(table_name)
+      @admin.enableTable(table_name)
     end
 
     #----------------------------------------------------------------------------------------------
     # Disables a table
     def disable(table_name)
-      return unless enabled?(table_name)
-      @admin.disableTableAsync(table_name)
+      return if disabled?(table_name)
+      @admin.disableTable(table_name)
     end
 
     #----------------------------------------------------------------------------------------------
@@ -104,15 +121,9 @@ module Hbase
     end
 
     #----------------------------------------------------------------------------------------------
-    # Shuts hbase down
-    def shutdown
-      @admin.shutdown
-    end
-
-    #----------------------------------------------------------------------------------------------
     # Returns ZooKeeper status dump
     def zk_dump
-      @zk_wrapper.dump
+      org.apache.hadoop.hbase.zookeeper.ZKUtil::dump(@zk_wrapper)
     end
 
     #----------------------------------------------------------------------------------------------
@@ -156,15 +167,21 @@ module Hbase
     end
 
     #----------------------------------------------------------------------------------------------
-    # Enables a region
-    def enable_region(region_name)
-      online(region_name, false)
+    # Assign a region
+    def assign(region_name, force)
+      @admin.assign(Bytes.toBytes(region_name), java.lang.Boolean::valueOf(force))
     end
 
     #----------------------------------------------------------------------------------------------
-    # Disables a region
-    def disable_region(region_name)
-      online(region_name, true)
+    # Unassign a region
+    def unassign(region_name, force)
+      @admin.unassign(Bytes.toBytes(region_name), java.lang.Boolean::valueOf(force))
+    end
+
+    #----------------------------------------------------------------------------------------------
+    # Move a region
+    def move(encoded_region_name, server = nil)
+      @admin.move(Bytes.toBytes(encoded_region_name), server ? Bytes.toBytes(server): nil)
     end
 
     #----------------------------------------------------------------------------------------------
@@ -337,14 +354,28 @@ module Hbase
       family ||= HColumnDescriptor.new(name.to_java_bytes)
 
       family.setBlockCacheEnabled(JBoolean.valueOf(arg[HColumnDescriptor::BLOCKCACHE])) if arg.include?(HColumnDescriptor::BLOCKCACHE)
-      family.setBloomFilterType(arg[HColumnDescriptor::BLOOMFILTER]) if arg.include?(HColumnDescriptor::BLOOMFILTER)
       family.setScope(JInteger.valueOf(arg[REPLICATION_SCOPE])) if arg.include?(HColumnDescriptor::REPLICATION_SCOPE)
       family.setInMemory(JBoolean.valueOf(arg[IN_MEMORY])) if arg.include?(HColumnDescriptor::IN_MEMORY)
       family.setTimeToLive(JInteger.valueOf(arg[HColumnDescriptor::TTL])) if arg.include?(HColumnDescriptor::TTL)
       family.setCompressionType(arg[HColumnDescriptor::COMPRESSION]) if arg.include?(HColumnDescriptor::COMPRESSION)
       family.setBlocksize(JInteger.valueOf(arg[HColumnDescriptor::BLOCKSIZE])) if arg.include?(HColumnDescriptor::BLOCKSIZE)
       family.setMaxVersions(JInteger.valueOf(arg[VERSIONS])) if arg.include?(HColumnDescriptor::VERSIONS)
-
+      if arg.include?(HColumnDescriptor::BLOOMFILTER)
+        bloomtype = arg[HColumnDescriptor::BLOOMFILTER].upcase
+        unless StoreFile::BloomType.constants.include?(bloomtype)      
+          raise(ArgumentError, "BloomFilter type #{bloomtype} is not supported. Use one of " + StoreFile::BloomType.constants.join(" ")) 
+        else 
+          family.setBloomFilterType(StoreFile::BloomType.valueOf(bloomtype))
+        end
+      end
+      if arg.include?(HColumnDescriptor::COMPRESSION)
+        compression = arg[HColumnDescriptor::COMPRESSION].upcase
+        unless Compression::Algorithm.constants.include?(compression)      
+          raise(ArgumentError, "Compression #{compression} is not supported. Use one of " + Compression::Algorithm.constants.join(" ")) 
+        else 
+          family.setCompressionType(Compression::Algorithm.valueOf(compression))
+        end
+      end
       return family
     end
 
@@ -369,13 +400,6 @@ module Hbase
       put = Put.new(region_bytes)
       put.add(HConstants::CATALOG_FAMILY, HConstants::REGIONINFO_QUALIFIER, Writables.getBytes(hri))
       meta.put(put)
-    end
-    #----------------------------------------------------------------------------------------------
-    # Invoke a ZooKeeper maintenance command
-    def zk(args)
-      line = args.join(' ')
-      line = 'help' if line.empty?
-      @zk_main.executeLine(line)
     end
   end
 end

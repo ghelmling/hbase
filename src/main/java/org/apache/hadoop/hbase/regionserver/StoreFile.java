@@ -19,6 +19,24 @@
  */
 package org.apache.hadoop.hbase.regionserver;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryUsage;
+import java.nio.ByteBuffer;
+import java.text.NumberFormat;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.SortedSet;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -46,23 +64,6 @@ import org.apache.hadoop.util.StringUtils;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
-
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryUsage;
-import java.nio.ByteBuffer;
-import java.text.NumberFormat;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
-import java.util.SortedSet;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * A Store data file.  Stores usually have one or more of these files.  They
@@ -303,7 +304,7 @@ public class StoreFile {
    * @return 0 if no non-bulk-load files are provided or, this is Store that
    * does not yet have any store files.
    */
-  public static long getMaxSequenceIdInList(List<StoreFile> sfs) {
+  public static long getMaxSequenceIdInList(Collection<StoreFile> sfs) {
     long max = 0;
     for (StoreFile sf : sfs) {
       if (!sf.isBulkLoadResult()) {
@@ -337,7 +338,7 @@ public class StoreFile {
   public static synchronized BlockCache getBlockCache(Configuration conf) {
     if (hfileBlockCache != null) return hfileBlockCache;
 
-    float cachePercentage = conf.getFloat(HFILE_BLOCK_CACHE_SIZE_KEY, 0.0f);
+    float cachePercentage = conf.getFloat(HFILE_BLOCK_CACHE_SIZE_KEY, 0.2f);
     // There should be a better way to optimize this. But oh well.
     if (cachePercentage == 0L) return null;
     if (cachePercentage > 1.0) {
@@ -376,7 +377,8 @@ public class StoreFile {
           getBlockCache(), this.reference);
     } else {
       this.reader = new Reader(this.fs, this.path, getBlockCache(),
-          this.inMemory);
+          this.inMemory,
+          this.conf.getBoolean("hbase.rs.evictblocksonclose", true));
     }
     // Load up indices and fileinfo.
     metadataMap = Collections.unmodifiableMap(this.reader.loadFileInfo());
@@ -529,7 +531,8 @@ public class StoreFile {
                                               final int blocksize)
       throws IOException {
 
-    return createWriter(fs, dir, blocksize, null, null, null, BloomType.NONE, 0);
+    return createWriter(fs, dir, blocksize, null, null, null, BloomType.NONE, 0,
+        false);
   }
 
   /**
@@ -554,7 +557,8 @@ public class StoreFile {
                                               final KeyValue.KVComparator c,
                                               final Configuration conf,
                                               BloomType bloomType,
-                                              int maxKeySize)
+                                              int maxKeySize,
+                                              final boolean cacheOnWrite)
       throws IOException {
 
     if (!fs.exists(dir)) {
@@ -567,7 +571,8 @@ public class StoreFile {
 
     return new Writer(fs, path, blocksize,
         algorithm == null? HFile.DEFAULT_COMPRESSION_ALGORITHM: algorithm,
-        conf, c == null? KeyValue.COMPARATOR: c, bloomType, maxKeySize);
+        conf, c == null? KeyValue.COMPARATOR: c, bloomType, maxKeySize,
+            cacheOnWrite);
   }
 
   /**
@@ -682,13 +687,17 @@ public class StoreFile {
      * @param comparator key comparator
      * @param bloomType bloom filter setting
      * @param maxKeys maximum amount of keys to add (for blooms)
+     * @param cacheOnWrite whether to cache blocks as we write file
      * @throws IOException problem writing to FS
      */
     public Writer(FileSystem fs, Path path, int blocksize,
         Compression.Algorithm compress, final Configuration conf,
-        final KVComparator comparator, BloomType bloomType, int maxKeys)
+        final KVComparator comparator, BloomType bloomType, int maxKeys,
+        boolean cacheOnWrite)
         throws IOException {
-      writer = new HFile.Writer(fs, path, blocksize, compress, comparator.getRawComparator());
+      writer = new HFile.Writer(fs, path, blocksize, compress,
+          comparator.getRawComparator(),
+          cacheOnWrite ? StoreFile.getBlockCache(conf) : null);
 
       this.kvComparator = comparator;
 
@@ -894,10 +903,18 @@ public class StoreFile {
     protected TimeRangeTracker timeRangeTracker = null;
     protected long sequenceID = -1;
 
-    public Reader(FileSystem fs, Path path, BlockCache blockCache, boolean inMemory)
+    public Reader(FileSystem fs, Path path, BlockCache blockCache,
+        boolean inMemory, boolean evictOnClose)
         throws IOException {
-      reader = new HFile.Reader(fs, path, blockCache, inMemory);
+      reader = new HFile.Reader(fs, path, blockCache, inMemory, evictOnClose);
       bloomFilterType = BloomType.NONE;
+    }
+
+    /**
+     * ONLY USE DEFAULT CONSTRUCTOR FOR UNIT TESTS
+     */
+    Reader() {
+      this.reader = null;
     }
 
     public RawComparator<byte []> getComparator() {
@@ -1123,5 +1140,15 @@ public class StoreFile {
       }
     }
 
+    /**
+     * FILE_SIZE = descending sort StoreFiles (largest --> smallest in size)
+     */
+    static final Comparator<StoreFile> FILE_SIZE =
+      Ordering.natural().reverse().onResultOf(new Function<StoreFile, Long>() {
+        @Override
+        public Long apply(StoreFile sf) {
+          return sf.getReader().length();
+        }
+      });
   }
 }

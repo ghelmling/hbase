@@ -259,12 +259,13 @@ public class LoadBalancer {
     for(Map.Entry<HServerInfo, List<HRegionInfo>> server :
       serversByLoad.entrySet()) {
       int regionCount = server.getKey().getLoad().getNumberOfRegions();
+      if (regionCount >= min) break;
       BalanceInfo balanceInfo = serverBalanceInfo.get(server.getKey());
       if(balanceInfo != null) {
         regionCount += balanceInfo.getNumRegionsAdded();
       }
       if(regionCount >= min) {
-        break;
+        continue;
       }
       int numToTake = min - regionCount;
       int numTaken = 0;
@@ -293,8 +294,20 @@ public class LoadBalancer {
 
     long endTime = System.currentTimeMillis();
 
-    assert(regionidx == regionsToMove.size());
-    assert(neededRegions == 0);
+    if (regionidx != regionsToMove.size() || neededRegions != 0) {
+      // Emit data so can diagnose how balancer went astray.
+      LOG.warn("regionidx=" + regionidx + ", regionsToMove=" + regionsToMove.size() +
+      ", numServers=" + numServers + ", serversOverloaded=" + serversOverloaded +
+      ", serversUnderloaded=" + serversUnderloaded);
+      StringBuilder sb = new StringBuilder();
+      for (Map.Entry<HServerInfo, List<HRegionInfo>> e: clusterState.entrySet()) {
+        if (sb.length() > 0) sb.append(", ");
+        sb.append(e.getKey().getServerName());
+        sb.append(" ");
+        sb.append(e.getValue().size());
+      }
+      LOG.warn("Input " + sb.toString());
+    }
 
     // All done!
     LOG.info("Calculated a load balance in " + (endTime-startTime) + "ms. " +
@@ -633,7 +646,7 @@ public class LoadBalancer {
     public String toString() {
       return "hri=" + this.hri.getRegionNameAsString() + ", src=" +
         (this.source == null? "": this.source.getServerName()) +
-        ", dest=" + this.dest.getServerName();
+        ", dest=" + (this.dest == null? "": this.dest.getServerName());
     }
   }
 }
