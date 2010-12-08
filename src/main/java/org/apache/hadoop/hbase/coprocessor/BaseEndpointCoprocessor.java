@@ -51,6 +51,14 @@ public abstract class BaseEndpointCoprocessor implements Coprocessor,
   }
 
   @Override
+  public void start(CoprocessorEnvironment env) {
+    this.env = env;
+  }
+
+  @Override
+  public void stop(CoprocessorEnvironment env) { }
+
+  @Override
   public long getProtocolVersion(String arg0, long arg1) throws IOException {
     return HBaseRPCProtocolVersion.versionID;
   }
