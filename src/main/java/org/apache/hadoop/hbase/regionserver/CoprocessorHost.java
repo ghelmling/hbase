@@ -270,6 +270,24 @@ public class CoprocessorHost {
     public Environment(final Coprocessor impl, Coprocessor.Priority priority) {
       this.impl = impl;
       this.priority = priority;
+      state = Coprocessor.State.INSTALLED;
+    }
+
+    /** Initialize the environment */
+    void startup() {
+      if (state == Coprocessor.State.INSTALLED ||
+          state == Coprocessor.State.STOPPED) {
+        state = Coprocessor.State.STARTING;
+        try {
+          impl.start(this);
+          state = Coprocessor.State.ACTIVE;
+        } catch (IOException ioe) {
+          LOG.error("Error starting coprocessor "+impl.getClass().getName(), ioe);
+        }
+      } else {
+        LOG.info("Not starting coprocessor "+impl.getClass().getName()+
+            " because not inactive (state="+state.toString()+")");
+      }
     }
 
     /** Clean up the environment */
@@ -278,7 +296,7 @@ public class CoprocessorHost {
         state = Coprocessor.State.STOPPING;
         try {
           impl.stop(this);
-          state = Coprocessor.State.UNINSTALLED;
+          state = Coprocessor.State.STOPPED;
         } catch (IOException ioe) {
           LOG.error("Error stopping coprocessor "+impl.getClass().getName(), ioe);
         }
@@ -511,6 +529,7 @@ public class CoprocessorHost {
     }
     // create the environment
     Environment env = new Environment(impl, priority);
+    env.startup();
 
     // Check if it's an Endpoint.
     // Due to current dynamic protocol design, Endpoint

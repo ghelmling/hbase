@@ -53,7 +53,8 @@ public interface Coprocessor {
     INSTALLED,
     STARTING,
     ACTIVE,
-    STOPPING
+    STOPPING,
+    STOPPED
   }
 
   // Interface

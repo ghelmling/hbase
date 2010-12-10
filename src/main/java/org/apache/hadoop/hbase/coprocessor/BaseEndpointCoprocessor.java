@@ -62,40 +62,4 @@ public abstract class BaseEndpointCoprocessor implements Coprocessor,
   public long getProtocolVersion(String arg0, long arg1) throws IOException {
     return HBaseRPCProtocolVersion.versionID;
   }
-
-  @Override
-  public void preOpen(CoprocessorEnvironment e) { }
-
-  /**
-   * It initializes the coprocessor resources. If you need to override this
-   * method, please remember to call super(e).
-   */
-  @Override
-  public void postOpen(CoprocessorEnvironment e) {
-    setEnvironment(e);
-  }
-
-  @Override
-  public void preClose(CoprocessorEnvironment e, boolean abortRequested) { }
-
-  @Override
-  public void postClose(CoprocessorEnvironment e, boolean abortRequested) { }
-
-  @Override
-  public void preFlush(CoprocessorEnvironment e) { }
-
-  @Override
-  public void postFlush(CoprocessorEnvironment e) { }
-
-  @Override
-  public void preCompact(CoprocessorEnvironment e, boolean willSplit) { }
-
-  @Override
-  public void postCompact(CoprocessorEnvironment e, boolean willSplit) { }
-
-  @Override
-  public void preSplit(CoprocessorEnvironment e) { }
-
-  @Override
-  public void postSplit(CoprocessorEnvironment e, HRegion l, HRegion r) { }
 }
