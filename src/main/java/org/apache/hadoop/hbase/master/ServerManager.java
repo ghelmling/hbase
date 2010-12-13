@@ -87,7 +87,7 @@ public class ServerManager {
   // Reporting to track master metrics.
   private final MasterMetrics metrics;
 
-  final DeadServer deadservers = new DeadServer();
+  private final DeadServer deadservers;
 
   private final long maxSkew;
 
@@ -104,6 +104,8 @@ public class ServerManager {
     this.metrics = metrics;
     Configuration c = master.getConfiguration();
     maxSkew = c.getLong("hbase.master.maxclockskew", 30000);
+    this.deadservers =
+      new DeadServer(c.getInt("hbase.master.maxdeadservers", 100));
   }
 
   /**
@@ -400,6 +402,14 @@ public class ServerManager {
   }
 
   /**
+   * Checks if any dead servers are currently in progress.
+   * @return true if any RS are being processed as dead, false if not
+   */
+  public boolean areDeadServersInProgress() {
+    return this.deadservers.areDeadServersInProgress();
+  }
+
+  /**
    * @param hsa
    * @return The HServerInfo whose HServerAddress is <code>hsa</code> or null
    * if nothing found.
@@ -568,17 +578,13 @@ public class ServerManager {
    */
   public boolean sendRegionClose(HServerInfo server, HRegionInfo region)
   throws IOException {
-    if (server == null) {
-      LOG.debug("Unable to send region close because server is null; region=" +
-          region.getRegionNameAsString());
-      return false;
-    }
+    if (server == null) throw new NullPointerException("Passed server is null");
     HRegionInterface hri = getServerConnection(server);
-    if(hri == null) {
-      LOG.warn("Attempting to send CLOSE RPC to server " +
-        server.getServerName() + " for region " + region.getRegionNameAsString()
-        + " failed because no RPC connection found to this server");
-      return false;
+    if (hri == null) {
+      throw new IOException("Attempting to send CLOSE RPC to server " +
+        server.getServerName() + " for region " +
+        region.getRegionNameAsString() +
+        " failed because no RPC connection found to this server");
     }
     return hri.closeRegion(region);
   }

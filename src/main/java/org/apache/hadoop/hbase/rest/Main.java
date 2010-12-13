@@ -30,6 +30,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.rest.filter.GzipFilter;
 
 import java.util.List;
 import java.util.ArrayList;
@@ -71,8 +72,7 @@ public class Main implements Constants {
     RESTServlet servlet = RESTServlet.getInstance(conf);
 
     Options options = new Options();
-    options.addOption("p", "port", true, "Port to bind to [default:" +
-      DEFAULT_LISTEN_PORT + "]");
+    options.addOption("p", "port", true, "Port to bind to [default: 8080]");
     options.addOption("ro", "readonly", false, "Respond only to GET HTTP " +
       "method requests [default: false]");
 
@@ -124,8 +124,7 @@ public class Main implements Constants {
 
     // set up Jetty and run the embedded server
 
-    int port = servlet.getConfiguration().getInt("hbase.rest.port",
-        DEFAULT_LISTEN_PORT);
+    int port = servlet.getConfiguration().getInt("hbase.rest.port", 8080);
 
     Server server = new Server(port);
     server.setSendServerVersion(false);
@@ -134,6 +133,7 @@ public class Main implements Constants {
       // set up context
     Context context = new Context(server, "/", Context.SESSIONS);
     context.addServlet(sh, "/*");
+    context.addFilter(GzipFilter.class, "/*", 0);
 
     server.start();
     server.join();

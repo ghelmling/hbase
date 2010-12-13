@@ -189,6 +189,9 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     }
     // create the environment
     E env = createEnvironment(implClass, impl, priority);
+    if (env instanceof Environment) {
+      ((Environment)env).startup();
+    }
 
     try {
       coprocessorLock.writeLock().lock();
@@ -438,6 +441,8 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     protected Map<Object,Object> vars = new ConcurrentHashMap<Object,Object>();
     /** Chaining priority */
     protected Coprocessor.Priority priority = Coprocessor.Priority.USER;
+    /** Current coprocessor state */
+    Coprocessor.State state = Coprocessor.State.UNINSTALLED;
     /** Accounting for tables opened by the coprocessor */
     protected List<HTableInterface> openTables =
       Collections.synchronizedList(new ArrayList<HTableInterface>());
@@ -452,8 +457,37 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       this.priority = priority;
     }
 
+    /** Initialize the environment */
+    void startup() {
+      if (state == Coprocessor.State.INSTALLED ||
+          state == Coprocessor.State.STOPPED) {
+        state = Coprocessor.State.STARTING;
+        try {
+          impl.start(this);
+          state = Coprocessor.State.ACTIVE;
+        } catch (IOException ioe) {
+          LOG.error("Error starting coprocessor "+impl.getClass().getName(), ioe);
+        }
+      } else {
+        LOG.info("Not starting coprocessor "+impl.getClass().getName()+
+            " because not inactive (state="+state.toString()+")");
+      }
+    }
+
     /** Clean up the environment */
     protected void shutdown() {
+      if (state == Coprocessor.State.ACTIVE) {
+        state = Coprocessor.State.STOPPING;
+        try {
+          impl.stop(this);
+          state = Coprocessor.State.STOPPED;
+        } catch (IOException ioe) {
+          LOG.error("Error stopping coprocessor "+impl.getClass().getName(), ioe);
+        }
+      } else {
+        LOG.info("Not stopping coprocessor "+impl.getClass().getName()+
+            " because not active (state="+state.toString()+")");
+      }
       // clean up any table references
       for (HTableInterface table: openTables) {
         try {

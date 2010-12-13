@@ -36,38 +36,43 @@ import java.io.IOException;
  */
 public abstract class BaseRegionObserverCoprocessor implements Coprocessor,
     RegionObserver {
+  @Override
+  public void start(CoprocessorEnvironment e) { }
 
   @Override
-  public void preOpen(CoprocessorEnvironment e) { }
+  public void stop(CoprocessorEnvironment e) { }
 
   @Override
-  public void postOpen(CoprocessorEnvironment e) { }
+  public void preOpen(RegionCoprocessorEnvironment e) { }
 
   @Override
-  public void preClose(CoprocessorEnvironment e, boolean abortRequested)
+  public void postOpen(RegionCoprocessorEnvironment e) { }
+
+  @Override
+  public void preClose(RegionCoprocessorEnvironment e, boolean abortRequested)
     { }
 
   @Override
-  public void postClose(CoprocessorEnvironment e, boolean abortRequested)
+  public void postClose(RegionCoprocessorEnvironment e, boolean abortRequested)
     { }
 
   @Override
-  public void preFlush(CoprocessorEnvironment e) { }
+  public void preFlush(RegionCoprocessorEnvironment e) { }
 
   @Override
-  public void postFlush(CoprocessorEnvironment e) { }
+  public void postFlush(RegionCoprocessorEnvironment e) { }
 
   @Override
-  public void preSplit(CoprocessorEnvironment e) { }
+  public void preSplit(RegionCoprocessorEnvironment e) { }
 
   @Override
-  public void postSplit(CoprocessorEnvironment e, HRegion l, HRegion r) { }
+  public void postSplit(RegionCoprocessorEnvironment e, HRegion l, HRegion r) { }
 
   @Override
-  public void preCompact(CoprocessorEnvironment e, boolean willSplit) { }
+  public void preCompact(RegionCoprocessorEnvironment e, boolean willSplit) { }
 
   @Override
-  public void postCompact(CoprocessorEnvironment e, boolean willSplit) { }
+  public void postCompact(RegionCoprocessorEnvironment e, boolean willSplit) { }
 
   @Override
   public void preGetClosestRowBefore(final RegionCoprocessorEnvironment e,

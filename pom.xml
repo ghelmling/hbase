@@ -15,8 +15,8 @@
     pom not being found.  To fix, I've downloaded apache's pom
     from here https://repository.apache.org/content/repositories/releases/org/apache/apache/7/apache-7.pom
     saving it as 'pom.xml' into a directory named 'apache-7.pom'.  I then uncommented the below.
-    <relativePath>../apache-7.pom/</relativePath>
     -->
+    <relativePath>../apache-7.pom/</relativePath>
   </parent>
 
   <groupId>org.apache.hbase</groupId>
@@ -95,6 +95,14 @@
       <organizationUrl>http://www.trendmicro.com</organizationUrl>
     </developer>
     <developer>
+      <id>garyh</id>
+      <name>Gary Helmling</name>
+      <email>garyh@apache.org</email>
+      <timezone>-8</timezone>
+      <organization>Trend Micro</organization>
+      <organizationUrl>http://www.trendmicro.com</organizationUrl>
+    </developer>
+    <developer>
       <id>jdcryans</id>
       <name>Jean-Daniel Cryans</name>
       <email>jdcryans@apache.org</email>
@@ -115,8 +123,16 @@
       <name>Lars George</name>
       <email>larsgeorge@apache.org</email>
       <timezone>+1</timezone>
-      <organization>WorldLingo</organization>
-      <organizationUrl>http://www.worldlingo.com/</organizationUrl>
+      <organization>Cloudera</organization>
+      <organizationUrl>http://www.cloudera.com/</organizationUrl>
+    </developer>
+    <developer>
+      <id>nspiegelberg</id>
+      <name>Nicolas Spiegelberg</name>
+      <email>nspiegelberg@fb.com</email>
+      <timezone>-8</timezone>
+      <organization>Facebook</organization>
+      <organizationUrl>http://www.facebook.com</organizationUrl>
     </developer>
     <developer>
       <id>rawson</id>
@@ -146,31 +162,9 @@
 
   <repositories>
     <repository>
-      <id>temp-hadoop</id>
-      <name>Hadoop 0.20-append</name>
-      <url>http://people.apache.org/~stack/m2/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    <repository>
       <id>temp-thrift</id>
       <name>Thrift 0.2.0</name>
       <url>http://people.apache.org/~rawson/repo/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    <repository>
-      <id>apache-rsync</id>
-      <name>Apache ibiblio rsync repository</name>
-      <url>http://people.apache.org/repo/m2-ibiblio-rsync-repository/</url>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
@@ -321,6 +315,7 @@
         <artifactId>maven-assembly-plugin</artifactId>
         <configuration>
           <tarLongFileMode>gnu</tarLongFileMode>
+          <appendAssemblyId>false</appendAssemblyId>
           <descriptors>
             <descriptor>src/assembly/all.xml</descriptor>
           </descriptors>
@@ -479,7 +474,7 @@
     at revision 1034499 with this hdfs-895 patch:
     https://issues.apache.org/jira/secure/attachment/12459473/hdfs-895-branch-20-append.txt
     -->
-    <hadoop.version>0.20.3-append-r1034938-plusHDFS895-minusHDFS724</hadoop.version>
+    <hadoop.version>0.20-append-r1042285</hadoop.version>
     <jasper.version>5.5.23</jasper.version>
     <jaxb-api.version>2.1</jaxb-api.version>
     <jetty.version>6.1.25</jetty.version>

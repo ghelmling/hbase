@@ -20,15 +20,19 @@
 
 module Shell
   module Commands
-    class Shutdown < Command
+    class BalanceSwitch < Command
       def help
         return <<-EOF
-Shut down the cluster.
+Enable/Disable balancer. Returns previous balancer state.
 EOF
       end
 
-      def command
-        admin.shutdown
+      def command(enableDisable)
+        format_simple_command do
+          formatter.row([
+            admin.balance_switch(enableDisable)? "true" : "false"
+          ])
+        end
       end
     end
   end

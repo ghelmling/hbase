@@ -47,8 +47,10 @@ public class TestCoprocessorInterface extends HBaseTestCase {
   private static final HBaseTestingUtility TEST_UTIL =
     new HBaseTestingUtility();
 
-  public static class CoprocessorImpl implements Coprocessor {
+  public static class CoprocessorImpl extends BaseRegionObserverCoprocessor {
 
+    private boolean startCalled;
+    private boolean stopCalled;
     private boolean preOpenCalled;
     private boolean postOpenCalled;
     private boolean preCloseCalled;
@@ -61,62 +63,74 @@ public class TestCoprocessorInterface extends HBaseTestCase {
     private boolean postSplitCalled;
 
     @Override
-    public void preOpen(CoprocessorEnvironment e) {
+    public void start(CoprocessorEnvironment e) {
+      startCalled = true;
+    }
+
+    @Override
+    public void stop(CoprocessorEnvironment e) {
+      stopCalled = true;
+    }
+
+    @Override
+    public void preOpen(RegionCoprocessorEnvironment e) {
       preOpenCalled = true;
     }
     @Override
-    public void postOpen(CoprocessorEnvironment e) {
+    public void postOpen(RegionCoprocessorEnvironment e) {
       postOpenCalled = true;
     }
     @Override
-    public void preClose(CoprocessorEnvironment e, boolean abortRequested) {
+    public void preClose(RegionCoprocessorEnvironment e, boolean abortRequested) {
       preCloseCalled = true;
     }
     @Override
-    public void postClose(CoprocessorEnvironment e, boolean abortRequested) {
+    public void postClose(RegionCoprocessorEnvironment e, boolean abortRequested) {
       postCloseCalled = true;
     }
     @Override
-    public void preCompact(CoprocessorEnvironment e, boolean willSplit) {
+    public void preCompact(RegionCoprocessorEnvironment e, boolean willSplit) {
       preCompactCalled = true;
     }
     @Override
-    public void postCompact(CoprocessorEnvironment e, boolean willSplit) {
+    public void postCompact(RegionCoprocessorEnvironment e, boolean willSplit) {
       postCompactCalled = true;
     }
     @Override
-    public void preFlush(CoprocessorEnvironment e) {
+    public void preFlush(RegionCoprocessorEnvironment e) {
       preFlushCalled = true;
     }
     @Override
-    public void postFlush(CoprocessorEnvironment e) {
+    public void postFlush(RegionCoprocessorEnvironment e) {
       postFlushCalled = true;
     }
     @Override
-    public void preSplit(CoprocessorEnvironment e) {
+    public void preSplit(RegionCoprocessorEnvironment e) {
       preSplitCalled = true;
     }
     @Override
-    public void postSplit(CoprocessorEnvironment e, HRegion l, HRegion r) {
+    public void postSplit(RegionCoprocessorEnvironment e, HRegion l, HRegion r) {
       postSplitCalled = true;
     }
 
+    boolean wasStarted() {
+      return startCalled;
+    }
+    boolean wasStopped() {
+      return stopCalled;
+    }
     boolean wasOpened() {
       return (preOpenCalled && postOpenCalled);
     }
-
     boolean wasClosed() {
       return (preCloseCalled && postCloseCalled);
     }
-
     boolean wasFlushed() {
       return (preFlushCalled && postFlushCalled);
     }
-
     boolean wasCompacted() {
       return (preCompactCalled && postCompactCalled);
     }
-
     boolean wasSplit() {
       return (preSplitCalled && postSplitCalled);
     }
@@ -143,6 +157,8 @@ public class TestCoprocessorInterface extends HBaseTestCase {
 
     Coprocessor c = region.getCoprocessorHost()
       .findCoprocessor(CoprocessorImpl.class.getName());
+    assertTrue("Coprocessor not started", ((CoprocessorImpl)c).wasStarted());
+    assertTrue("Coprocessor not stopped", ((CoprocessorImpl)c).wasStopped());
     assertTrue(((CoprocessorImpl)c).wasOpened());
     assertTrue(((CoprocessorImpl)c).wasClosed());
     assertTrue(((CoprocessorImpl)c).wasFlushed());
@@ -154,6 +170,8 @@ public class TestCoprocessorInterface extends HBaseTestCase {
       regions[i].getLog().closeAndDelete();
       c = region.getCoprocessorHost()
             .findCoprocessor(CoprocessorImpl.class.getName());
+      assertTrue("Coprocessor not started", ((CoprocessorImpl)c).wasStarted());
+      assertTrue("Coprocessor not stopped", ((CoprocessorImpl)c).wasStopped());
       assertTrue(((CoprocessorImpl)c).wasOpened());
       assertTrue(((CoprocessorImpl)c).wasClosed());
       assertTrue(((CoprocessorImpl)c).wasCompacted());
@@ -202,6 +220,9 @@ public class TestCoprocessorInterface extends HBaseTestCase {
     r.setCoprocessorHost(host);
 
     host.load(implClass, Priority.USER);
+
+    Coprocessor c = host.findCoprocessor(implClass.getName());
+    assertNotNull(c);
 
     // Here we have to call pre and postOpen explicitly.
     host.preOpen();

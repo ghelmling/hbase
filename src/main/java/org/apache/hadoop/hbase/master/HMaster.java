@@ -22,6 +22,7 @@ package org.apache.hadoop.hbase.master;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
@@ -155,7 +156,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   // flag set after we become the active master (used for testing)
   private volatile boolean isActiveMaster = false;
   // flag set after we complete initialization once active (used for testing)
-  private volatile boolean isInitialized = false;
+  private volatile boolean initialized = false;
 
   // Instance of the hbase executor service.
   ExecutorService executorService;
@@ -241,7 +242,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     while (!amm.isActiveMaster()) {
       LOG.debug("Waiting for master address ZNode to be written " +
         "(Also watching cluster state node)");
-      Thread.sleep(c.getInt("zookeeper.session.timeout", 60 * 1000));
+      Thread.sleep(c.getInt("zookeeper.session.timeout", 180 * 1000));
     }
   }
 
@@ -404,7 +405,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       Threads.setDaemonThreadRunning(new CatalogJanitor(this, this));
 
     LOG.info("Master has completed initialization");
-    isInitialized = true;
+    initialized = true;
   }
 
   /**
@@ -562,7 +563,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     }
     if (this.rpcServer != null) this.rpcServer.stop();
     // Clean up and close up shop
-    this.logCleaner.interrupt();
+    if (this.logCleaner!= null) this.logCleaner.interrupt();
     if (this.infoServer != null) {
       LOG.info("Stopping infoServer");
       try {
@@ -604,16 +605,18 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     // not the ip that the master sees here.  See at end of this method where
     // we pass it back to the regionserver by setting "hbase.regionserver.address"
     // Everafter, the HSI combination 'server name' is what uniquely identifies
-    // the incoming RegionServer.  No more DNS meddling of this little messing
-    // belose.
-    String rsAddress = HBaseServer.getRemoteAddress();
-    serverInfo.setServerAddress(new HServerAddress(rsAddress,
-      serverInfo.getServerAddress().getPort()));
+    // the incoming RegionServer.
+    InetSocketAddress address = new InetSocketAddress(
+        HBaseServer.getRemoteIp().getHostName(),
+        serverInfo.getServerAddress().getPort());
+    serverInfo.setServerAddress(new HServerAddress(address));
+
     // Register with server manager
     this.serverManager.regionServerStartup(serverInfo, serverCurrentTime);
     // Send back some config info
     MapWritable mw = createConfigurationSubset();
-     mw.put(new Text("hbase.regionserver.address"), new Text(rsAddress));
+     mw.put(new Text("hbase.regionserver.address"),
+         serverInfo.getServerAddress());
     return mw;
   }
 
@@ -669,8 +672,10 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
             abbreviate(this.assignmentManager.getRegionsInTransition().toString(), 256));
         return false;
       }
-      if (!this.serverManager.getDeadServers().isEmpty()) {
-        LOG.debug("Not running balancer because dead regionserver processing");
+      if (this.serverManager.areDeadServersInProgress()) {
+        LOG.debug("Not running balancer because processing dead regionserver(s): " +
+          this.serverManager.getDeadServers());
+        return false;
       }
 
       if (this.cpHost != null) {
@@ -736,16 +741,25 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       this.assignmentManager.getAssignment(encodedRegionName);
     if (p == null)
       throw new UnknownRegionException(Bytes.toString(encodedRegionName));
-    HServerInfo dest =
-      this.serverManager.getServerInfo(new String(destServerName));
-    
-    if (this.cpHost != null) {
-      this.cpHost.preMove(p.getFirst(), p.getSecond(), dest);
-    }
-    RegionPlan rp = new RegionPlan(p.getFirst(), p.getSecond(), dest);
-    this.assignmentManager.balance(rp);
-    if (this.cpHost != null) {
-      this.cpHost.postMove(p.getFirst(), p.getSecond(), dest);
+    HRegionInfo hri = p.getFirst();
+    HServerInfo dest = null;
+    if (destServerName == null || destServerName.length == 0) {
+      LOG.info("Passed destination servername is null/empty so " +
+        "choosing a server at random");
+      this.assignmentManager.clearRegionPlan(hri);
+      // Unassign will reassign it elsewhere choosing random server.
+      this.assignmentManager.unassign(hri);
+    } else {
+      dest = this.serverManager.getServerInfo(new String(destServerName));
+
+      if (this.cpHost != null) {
+        this.cpHost.preMove(p.getFirst(), p.getSecond(), dest);
+      }
+      RegionPlan rp = new RegionPlan(p.getFirst(), p.getSecond(), dest);
+      this.assignmentManager.balance(rp);
+      if (this.cpHost != null) {
+        this.cpHost.postMove(p.getFirst(), p.getSecond(), dest);
+      }
     }
   }
 
@@ -798,18 +812,27 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       throw new TableExistsException(tableName);
     }
     for(HRegionInfo newRegion : newRegions) {
-      // 1. Create HRegion
+
+      // 1. Set table enabling flag up in zk.
+      try {
+        assignmentManager.getZKTable().setEnabledTable(tableName);
+      } catch (KeeperException e) {
+        throw new IOException("Unable to ensure that the table will be" +
+            " enabled because of a ZooKeeper issue", e);
+      }
+
+      // 2. Create HRegion
       HRegion region = HRegion.createHRegion(newRegion,
           fileSystemManager.getRootDir(), conf);
 
-      // 2. Insert into META
+      // 3. Insert into META
       MetaEditor.addRegionToMeta(catalogTracker, region.getRegionInfo());
 
-      // 3. Close the new region to flush to disk.  Close log file too.
+      // 4. Close the new region to flush to disk.  Close log file too.
       region.close();
       region.getLog().closeAndDelete();
 
-      // 4. Trigger immediate assignment of this region
+      // 5. Trigger immediate assignment of this region
       assignmentManager.assign(region.getRegionInfo(), true);
     }
 
@@ -842,7 +865,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     if (cpHost != null) {
       cpHost.preDeleteTable(tableName);
     }
-    new DeleteTableHandler(tableName, this, this).process();
+    this.executorService.submit(new DeleteTableHandler(tableName, this, this));
     if (cpHost != null) {
       cpHost.postDeleteTable(tableName);
     }
@@ -1079,11 +1102,31 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
    * @return true if master is ready to go, false if not.
    */
   public boolean isInitialized() {
-    return isInitialized;
+    return initialized;
+  }
+
+  @Override
+  public void assign(final byte [] regionName, final boolean force)
+  throws IOException {
+    Pair<HRegionInfo, HServerAddress> pair =
+      MetaReader.getRegion(this.catalogTracker, regionName);
+    if (pair == null) throw new UnknownRegionException(Bytes.toString(regionName));
+    assignRegion(pair.getFirst());
   }
 
   public void assignRegion(HRegionInfo hri) {
     assignmentManager.assign(hri, true);
+  }
+
+  @Override
+  public void unassign(final byte [] regionName, final boolean force)
+  throws IOException {
+    Pair<HRegionInfo, HServerAddress> pair =
+      MetaReader.getRegion(this.catalogTracker, regionName);
+    if (pair == null) throw new UnknownRegionException(Bytes.toString(regionName));
+    HRegionInfo hri = pair.getFirst();
+    if (force) this.assignmentManager.clearRegionFromTransition(hri);
+    this.assignmentManager.unassign(hri, force);
   }
 
   /**

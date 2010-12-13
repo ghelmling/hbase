@@ -169,8 +169,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     loadTableCoprocessors();
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().preOpen(env);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preOpen(env);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -183,8 +185,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postOpen() {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().postOpen(env);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postOpen(env);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -198,8 +202,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preClose(boolean abortRequested) {
     try {
       coprocessorLock.writeLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().preClose(env, abortRequested);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preClose(env, abortRequested);
+        }
         shutdown(env);
       }
     } finally {
@@ -214,8 +220,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postClose(boolean abortRequested) {
     try {
       coprocessorLock.writeLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().postClose(env, abortRequested);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postClose(env, abortRequested);
+        }
         shutdown(env);
       }
     } finally {
@@ -230,8 +238,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preCompact(boolean willSplit) {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().preCompact(env, willSplit);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preCompact(env, willSplit);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -245,8 +255,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postCompact(boolean willSplit) {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().postCompact(env, willSplit);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postCompact(env, willSplit);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -259,8 +271,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preFlush() {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().preFlush(env);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preFlush(env);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -273,8 +287,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postFlush() {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().postFlush(env);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postFlush(env);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -287,8 +303,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preSplit() {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().preSplit(env);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preSplit(env);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
@@ -303,8 +321,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postSplit(HRegion l, HRegion r) {
     try {
       coprocessorLock.readLock().lock();
-      for (CoprocessorEnvironment env: coprocessors) {
-        env.getInstance().postSplit(env, l, r);
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).postSplit(env, l, r);
+        }
       }
     } finally {
       coprocessorLock.readLock().unlock();
