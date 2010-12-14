@@ -29,7 +29,7 @@ import java.io.IOException;
  * {@link org.apache.hadoop.hbase.master.HMaster} process.
  */
 public interface MasterObserver {
-  HTableDescriptor preCreateTable(CoprocessorEnvironment env,
+  HTableDescriptor preCreateTable(MasterCoprocessorEnvironment env,
       HTableDescriptor desc, byte[][] splitKeys) throws IOException;
   void postCreateTable(MasterCoprocessorEnvironment env,
       HRegionInfo[] regions, boolean sync) throws IOException;
