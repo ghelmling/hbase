@@ -1021,6 +1021,10 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     return zooKeeper;
   }
 
+  public MasterCoprocessorHost getCoprocessorHost() {
+    return cpHost;
+  }
+
   @Override
   public String getServerName() {
     return address.toString();

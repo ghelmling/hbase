@@ -28,7 +28,7 @@ import java.io.IOException;
  * Defines coprocessor hooks for interacting with operations on the
  * {@link org.apache.hadoop.hbase.master.HMaster} process.
  */
-public interface MasterObserver {
+public interface MasterObserver extends Coprocessor {
   HTableDescriptor preCreateTable(MasterCoprocessorEnvironment env,
       HTableDescriptor desc, byte[][] splitKeys) throws IOException;
   void postCreateTable(MasterCoprocessorEnvironment env,
