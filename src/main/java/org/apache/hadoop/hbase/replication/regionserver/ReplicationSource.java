@@ -605,7 +605,8 @@ public class ReplicationSource extends Thread
       return true;
     } else if (this.queueRecovered) {
       this.manager.closeRecoveredQueue(this);
-      this.terminate("Finished recovering the queue");
+      LOG.info("Finished recovering the queue");
+      this.running = false;
       return true;
     }
     return false;
@@ -629,11 +630,12 @@ public class ReplicationSource extends Thread
 
   public void terminate(String reason, Exception cause) {
     if (cause == null) {
-      LOG.error("Closing source " + this.peerClusterZnode
-          + " because an error occurred: " + reason, cause);
-    } else {
       LOG.info("Closing source "
           + this.peerClusterZnode + " because: " + reason);
+
+    } else {
+      LOG.error("Closing source " + this.peerClusterZnode
+          + " because an error occurred: " + reason, cause);
     }
     this.running = false;
     Threads.shutdown(this, this.sleepForRetries);

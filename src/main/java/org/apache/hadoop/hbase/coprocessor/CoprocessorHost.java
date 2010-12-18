@@ -54,6 +54,16 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
   protected final ReentrantReadWriteLock coprocessorLock = new ReentrantReadWriteLock();
   protected Set<E> coprocessors =
     new TreeSet<E>(new EnvironmentPriorityComparator());
+  static final ThreadLocal<Boolean> bypass = new ThreadLocal<Boolean>() {
+    @Override protected Boolean initialValue() {
+      return Boolean.FALSE;
+    }
+  };
+  static final ThreadLocal<Boolean> complete = new ThreadLocal<Boolean>() {
+    @Override protected Boolean initialValue() {
+      return Boolean.FALSE;
+    }
+  };
   // unique file prefix to use for local copies of jars when classloading
   protected String pathPrefix;
 
@@ -470,7 +480,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
           LOG.error("Error starting coprocessor "+impl.getClass().getName(), ioe);
         }
       } else {
-        LOG.info("Not starting coprocessor "+impl.getClass().getName()+
+        LOG.warn("Not starting coprocessor "+impl.getClass().getName()+
             " because not inactive (state="+state.toString()+")");
       }
     }
@@ -486,19 +496,31 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
           LOG.error("Error stopping coprocessor "+impl.getClass().getName(), ioe);
         }
       } else {
-        LOG.info("Not stopping coprocessor "+impl.getClass().getName()+
+        LOG.warn("Not stopping coprocessor "+impl.getClass().getName()+
             " because not active (state="+state.toString()+")");
       }
       // clean up any table references
       for (HTableInterface table: openTables) {
         try {
-          ((RegionCoprocessorHost.Environment.HTableWrapper)table).internalClose();
+          ((HTableWrapper)table).internalClose();
         } catch (IOException e) {
           // nothing can be done here
           LOG.warn("Failed to close " +
               Bytes.toStringBinary(table.getTableName()), e);
         }
       }
+    }
+
+    public boolean shouldBypass() {
+      boolean current = bypass.get();
+      bypass.set(false);
+      return current;
+    }
+
+    public boolean shouldComplete() {
+      boolean current = complete.get();
+      complete.set(false);
+      return current;
     }
 
     @Override
@@ -531,33 +553,16 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
      */
     @Override
     public HTableInterface getTable(byte[] tableName) throws IOException {
-      return new RegionCoprocessorHost.Environment.HTableWrapper(tableName);
+      return new HTableWrapper(tableName);
     }
 
-    /**
-     * @param key the key
-     * @return the value, or null if it does not exist
-     */
     @Override
-    public Object get(Object key) {
-      return vars.get(key);
+    public void complete() {
+      complete.set(true);
     }
 
-    /**
-     * @param key the key
-     * @param value the value
-     */
     @Override
-    public void put(Object key, Object value) {
-      vars.put(key, value);
+    public void bypass() {
+      bypass.set(true);
     }
-
-    /**
-     * @param key the key
-     */
-    @Override
-    public Object remove(Object key) {
-      return vars.remove(key);
-    }
-  }
-}
+  }}

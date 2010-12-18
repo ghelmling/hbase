@@ -172,6 +172,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preOpen(env);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -188,6 +191,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postOpen(env);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -206,7 +212,6 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preClose(env, abortRequested);
         }
-        shutdown(env);
       }
     } finally {
       coprocessorLock.writeLock().unlock();
@@ -241,6 +246,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preCompact(env, willSplit);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -258,6 +266,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postCompact(env, willSplit);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -274,6 +285,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preFlush(env);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -290,6 +304,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postFlush(env);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -306,6 +323,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preSplit(env);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -324,6 +344,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postSplit(env, l, r);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -336,17 +359,26 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   /**
    * @param row the row key
    * @param family the family
+   * @param result the result set from the region
+   * @return true if default processing should be bypassed
    * @exception IOException Exception
    */
-  public void preGetClosestRowBefore(final byte[] row, final byte[] family)
-  throws IOException {
+  public boolean preGetClosestRowBefore(final byte[] row, final byte[] family,
+      final Result result) throws IOException {
     try {
+      boolean bypass = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).preGetClosestRowBefore(env, row, family);
+          ((RegionObserver)env.getInstance()).preGetClosestRowBefore(env, row, family,
+            result);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return bypass;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -356,20 +388,21 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @param row the row key
    * @param family the family
    * @param result the result set from the region
-   * @return the result set to return to the client
    * @exception IOException Exception
    */
-  public Result postGetClosestRowBefore(final byte[] row, final byte[] family,
-      Result result) throws IOException {
+  public void postGetClosestRowBefore(final byte[] row, final byte[] family,
+      final Result result) throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          result = ((RegionObserver)env.getInstance())
-            .postGetClosestRowBefore(env, row, family, result);
+          ((RegionObserver)env.getInstance()).postGetClosestRowBefore(env, row, family,
+            result);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return result;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -377,18 +410,24 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param get the Get request
-   * @return the possibly transformed Get object by coprocessor
+   * @return true if default processing should be bypassed
    * @exception IOException Exception
    */
-  public Get preGet(Get get) throws IOException {
+  public boolean preGet(final Get get, final List<KeyValue> results)
+      throws IOException {
     try {
+      boolean bypass = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          get = ((RegionObserver)env.getInstance()).preGet(env, get);
+          ((RegionObserver)env.getInstance()).preGet(env, get, results);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return get;
+      return bypass;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -400,16 +439,18 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @return the possibly transformed result set to use
    * @exception IOException Exception
    */
-  public List<KeyValue> postGet(final Get get, List<KeyValue> results)
+  public void postGet(final Get get, final List<KeyValue> results)
   throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          results = ((RegionObserver)env.getInstance()).postGet(env, get, results);
+          ((RegionObserver)env.getInstance()).postGet(env, get, results);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return results;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -417,17 +458,25 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param get the Get request
+   * @return true or false to return to client if bypassing normal operation,
+   * or null otherwise
    * @exception IOException Exception
    */
-  public Get preExists(Get get) throws IOException {
+  public Boolean preExists(final Get get) throws IOException {
     try {
+      boolean bypass = false;
+      boolean exists = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          get = ((RegionObserver)env.getInstance()).preExists(env, get);
+          exists = ((RegionObserver)env.getInstance()).preExists(env, get, exists);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
         }
       }
-      return get;
+      }
+      return bypass ? exists : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -445,7 +494,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          exists &= ((RegionObserver)env.getInstance()).postExists(env, get, exists);
+          exists = ((RegionObserver)env.getInstance()).postExists(env, get, exists);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
       return exists;
@@ -456,19 +508,25 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param familyMap map of family to edits for the given family.
-   * @return the possibly transformed map to actually use
+   * @param writeToWAL true if the change should be written to the WAL
+   * @return true if default processing should be bypassed
    * @exception IOException Exception
    */
-  public Map<byte[], List<KeyValue>> prePut(Map<byte[], List<KeyValue>> familyMap)
-  throws IOException {
+  public boolean prePut(final Map<byte[], List<KeyValue>> familyMap,
+      final boolean writeToWAL) throws IOException {
     try {
+      boolean bypass = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          familyMap = ((RegionObserver)env.getInstance()).prePut(env, familyMap);
+          ((RegionObserver)env.getInstance()).prePut(env, familyMap, writeToWAL);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return familyMap;
+      return bypass;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -476,15 +534,19 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param familyMap map of family to edits for the given family.
+   * @param writeToWAL true if the change should be written to the WAL
    * @exception IOException Exception
    */
-  public void postPut(Map<byte[], List<KeyValue>> familyMap)
-  throws IOException {
+  public void postPut(final Map<byte[], List<KeyValue>> familyMap,
+      final boolean writeToWAL) throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).postPut(env, familyMap);
+          ((RegionObserver)env.getInstance()).postPut(env, familyMap, writeToWAL);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -494,19 +556,25 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param familyMap map of family to edits for the given family.
-   * @return the possibly transformed map to actually use
+   * @param writeToWAL true if the change should be written to the WAL
+   * @return true if default processing should be bypassed
    * @exception IOException Exception
    */
-  public Map<byte[], List<KeyValue>> preDelete(Map<byte[], List<KeyValue>> familyMap)
-  throws IOException {
+  public boolean preDelete(final Map<byte[], List<KeyValue>> familyMap,
+      final boolean writeToWAL) throws IOException {
     try {
+      boolean bypass = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          familyMap = ((RegionObserver)env.getInstance()).preDelete(env, familyMap);
+          ((RegionObserver)env.getInstance()).preDelete(env, familyMap, writeToWAL);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return familyMap;
+      return bypass;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -514,15 +582,19 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param familyMap map of family to edits for the given family.
+   * @param writeToWAL true if the change should be written to the WAL
    * @exception IOException Exception
    */
-  public void postDelete(Map<byte[], List<KeyValue>> familyMap)
-  throws IOException {
+  public void postDelete(final Map<byte[], List<KeyValue>> familyMap,
+      final boolean writeToWAL) throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).postDelete(env, familyMap);
+          ((RegionObserver)env.getInstance()).postDelete(env, familyMap, writeToWAL);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -536,21 +608,29 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @param qualifier column qualifier
    * @param value the expected value
    * @param put data to put if check succeeds
+   * @return true or false to return to client if default processing should
+   * be bypassed, or null otherwise
    * @throws IOException e
    */
-  public Put preCheckAndPut(final byte [] row, final byte [] family,
+  public Boolean preCheckAndPut(final byte [] row, final byte [] family,
       final byte [] qualifier, final byte [] value, Put put)
     throws IOException
   {
     try {
+      boolean bypass = false;
+      boolean result = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          put = ((RegionObserver)env.getInstance()).preCheckAndPut(env, row, family,
-            qualifier, value, put);
+          result = ((RegionObserver)env.getInstance()).preCheckAndPut(env, row, family,
+            qualifier, value, put, result);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return put;
+      return bypass ? result : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -575,6 +655,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postCheckAndPut(env, row,
             family, qualifier, value, put, result);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
       return result;
@@ -589,21 +672,29 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @param qualifier column qualifier
    * @param value the expected value
    * @param delete delete to commit if check succeeds
+   * @return true or false to return to client if default processing should
+   * be bypassed, or null otherwise
    * @throws IOException e
    */
-  public Delete preCheckAndDelete(final byte [] row, final byte [] family,
+  public Boolean preCheckAndDelete(final byte [] row, final byte [] family,
       final byte [] qualifier, final byte [] value, Delete delete)
     throws IOException
   {
     try {
+      boolean bypass = false;
+      boolean result = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          delete = ((RegionObserver)env.getInstance()).preCheckAndDelete(env, row,
-              family, qualifier, value, delete);
+          result = ((RegionObserver)env.getInstance()).preCheckAndDelete(env, row,
+            family, qualifier, value, delete, result);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return delete;
+      return bypass ? result : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -628,7 +719,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postCheckAndDelete(env, row,
             family, qualifier, value, delete, result);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
         }
+      }
       }
       return result;
     } finally {
@@ -641,25 +735,31 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @param family column family
    * @param qualifier column qualifier
    * @param amount long amount to increment
-   * @param writeToWAL whether to write the increment to the WAL
-   * @return new amount to increment
+   * @param writeToWAL true if the change should be written to the WAL
+   * @return return value for client if default operation should be bypassed,
+   * or null otherwise
    * @throws IOException if an error occurred on the coprocessor
    */
-  public long preIncrementColumnValue(final byte [] row, final byte [] family,
+  public Long preIncrementColumnValue(final byte [] row, final byte [] family,
       final byte [] qualifier, long amount, final boolean writeToWAL)
       throws IOException {
     try {
+      boolean bypass = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           amount = ((RegionObserver)env.getInstance()).preIncrementColumnValue(env,
               row, family, qualifier, amount, writeToWAL);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return bypass ? amount : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return amount;
   }
 
   /**
@@ -667,7 +767,7 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
    * @param family column family
    * @param qualifier column qualifier
    * @param amount long amount to increment
-   * @param writeToWAL whether to write the increment to the WAL
+   * @param writeToWAL true if the change should be written to the WAL
    * @param result the result returned by incrementColumnValue
    * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
@@ -681,6 +781,9 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postIncrementColumnValue(env,
               row, family, qualifier, amount, writeToWAL, result);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -691,152 +794,200 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
 
   /**
    * @param increment increment object
-   * @return new amount to increment
+   * @return result to return to client if default operation should be
+   * bypassed, null otherwise
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Increment preIncrement(Increment increment)
+  public Result preIncrement(Increment increment)
       throws IOException {
     try {
+      boolean bypass = false;
+      Result result = new Result();
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          increment = ((RegionObserver)env.getInstance()).preIncrement(env, increment);
+          ((RegionObserver)env.getInstance()).preIncrement(env, increment, result);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return bypass ? result : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return increment;
   }
 
   /**
    * @param increment increment object
    * @param result the result returned by incrementColumnValue
-   * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Result postIncrement(final Increment increment, Result result)
+  public void postIncrement(final Increment increment, Result result)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          result = ((RegionObserver)env.getInstance()).postIncrement(env, increment,
-              result);
+          ((RegionObserver)env.getInstance()).postIncrement(env, increment, result);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return result;
   }
 
   /**
    * @param scan the Scan specification
+   * @return scanner id to return to client if default operation should be
+   * bypassed, false otherwise
    * @exception IOException Exception
    */
-  public Scan preScannerOpen(Scan scan) throws IOException {
+  public InternalScanner preScannerOpen(Scan scan) throws IOException {
     try {
+      boolean bypass = false;
+      InternalScanner s = null;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          scan = ((RegionObserver)env.getInstance()).preScannerOpen(env, scan);
+          s = ((RegionObserver)env.getInstance()).preScannerOpen(env, scan, s);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return bypass ? s : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return scan;
   }
 
   /**
    * @param scan the Scan specification
-   * @param scannerId the scanner id allocated by the region server
+   * @param s the scanner
+   * @return the scanner instance to use
    * @exception IOException Exception
    */
-  public void postScannerOpen(final Scan scan, long scannerId)
+  public InternalScanner postScannerOpen(final Scan scan, InternalScanner s)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).postScannerOpen(env, scan, scannerId);
+          s = ((RegionObserver)env.getInstance()).postScannerOpen(env, scan, s);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return s;
     } finally {
       coprocessorLock.readLock().unlock();
     }
   }
 
   /**
-   * @param scannerId the scanner id
-   * @return the possibly transformed result set to actually return
-   * @exception IOException Exception
-   */
-  public void preScannerNext(final long scannerId) throws IOException {
-    try {
-      coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
-        if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).preScannerNext(env, scannerId);
-        }
-      }
-    } finally {
-      coprocessorLock.readLock().unlock();
-    }
-  }
-
-  /**
-   * @param scannerId the scanner id
+   * @param s the scanner
    * @param results the result set returned by the region server
-   * @return the possibly transformed result set to actually return
+   * @param limit the maximum number of results to return
+   * @return 'has next' indication to client if bypassing default behavior, or
+   * null otherwise
    * @exception IOException Exception
    */
-  public List<KeyValue> postScannerNext(final long scannerId,
-      List<KeyValue> results) throws IOException {
+  public Boolean preScannerNext(final InternalScanner s,
+      final List<KeyValue> results, int limit) throws IOException {
     try {
+      boolean bypass = false;
+      boolean hasNext = false;
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          results = ((RegionObserver)env.getInstance()).postScannerNext(env, scannerId,
-            results);
+          hasNext = ((RegionObserver)env.getInstance()).preScannerNext(env, s, results,
+            limit, hasNext);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
-      return results;
+      return bypass ? hasNext : null;
     } finally {
       coprocessorLock.readLock().unlock();
     }
   }
 
   /**
-   * @param scannerId the scanner id
+   * @param s the scanner
+   * @param results the result set returned by the region server
+   * @param limit the maximum number of results to return
+   * @param hasMore
+   * @return 'has more' indication to give to client
    * @exception IOException Exception
    */
-  public void preScannerClose(final long scannerId)
+  public boolean postScannerNext(final InternalScanner s,
+      final List<KeyValue> results, final int limit, boolean hasMore)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).preScannerClose(env, scannerId);
+          hasMore = ((RegionObserver)env.getInstance()).postScannerNext(env, s,
+            results, limit, hasMore);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
+      return hasMore;
     } finally {
       coprocessorLock.readLock().unlock();
     }
   }
 
   /**
-   * @param scannerId the scanner id
+   * @param s the scanner
+   * @return true if default behavior should be bypassed, false otherwise
    * @exception IOException Exception
    */
-  public void postScannerClose(final long scannerId)
+  public boolean preScannerClose(final InternalScanner s)
+      throws IOException {
+    try {
+      boolean bypass = false;
+      coprocessorLock.readLock().lock();
+      for (RegionCoprocessorEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof RegionObserver) {
+          ((RegionObserver)env.getInstance()).preScannerClose(env, s);
+          bypass |= ((RegionEnvironment)env).shouldBypass();
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
+        }
+      }
+      return bypass;
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  /**
+   * @param s the scanner
+   * @exception IOException Exception
+   */
+  public void postScannerClose(final InternalScanner s)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (RegionCoprocessorEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
-          ((RegionObserver)env.getInstance()).postScannerClose(env, scannerId);
+          ((RegionObserver)env.getInstance()).postScannerClose(env, s);
+          if (((RegionEnvironment)env).shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {

@@ -28,6 +28,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.coprocessor.CoprocessorEnvironment;
 import org.apache.hadoop.hbase.regionserver.HRegion;
+import org.apache.hadoop.hbase.regionserver.InternalScanner;
 
 import java.io.IOException;
 
@@ -101,73 +102,105 @@ public interface RegionObserver extends Coprocessor {
    * @param e the environment provided by the region server
    * @param abortRequested true if the region server is aborting
    */
-  public void preClose(final RegionCoprocessorEnvironment e, boolean abortRequested);
+  public void preClose(final RegionCoprocessorEnvironment e,
+      boolean abortRequested);
 
   /**
    * Called after the region is reported as closed to the master.
    * @param e the environment provided by the region server
    * @param abortRequested true if the region server is aborting
    */
-  public void postClose(final RegionCoprocessorEnvironment e, boolean abortRequested);
+  public void postClose(final RegionCoprocessorEnvironment e,
+      boolean abortRequested);
 
   /**
    * Called before a client makes a GetClosestRowBefore request.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row the row
    * @param family the family
+   * @param result The result to return to the client if default processing
+   * is bypassed. Can be modified. Will not be used if default processing
+   * is not bypassed.
    * @throws IOException if an error occurred on the coprocessor
    */
   public void preGetClosestRowBefore(final RegionCoprocessorEnvironment e,
-      final byte [] row, final byte [] family)
-    throws IOException;
-
-  /**
-   * Called after a client makes a GetClosestRowBefore request.
-   * @param e the environment provided by the region server
-   * @param row the row
-   * @param family the desired family
-   * @param result the result set
-   * @return the possible tranformed result set to return to the client
-   * @throws IOException if an error occurred on the coprocessor
-   */
-  public Result postGetClosestRowBefore(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final Result result)
     throws IOException;
 
   /**
-   * Called before the client perform a get()
+   * Called after a client makes a GetClosestRowBefore request.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param get the Get request
-   * @return the possibly transformed Get object by coprocessor
+   * @param row the row
+   * @param family the desired family
+   * @param result the result to return to the client, modify as necessary
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Get preGet(final RegionCoprocessorEnvironment e, final Get get)
+  public void postGetClosestRowBefore(final RegionCoprocessorEnvironment e,
+      final byte [] row, final byte [] family, final Result result)
     throws IOException;
 
   /**
-   * Called after the client perform a get()
+   * Called before the client performs a Get
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param get the Get request
-   * @param results the result list
-   * @return the possibly transformed result list to return to client
+   * @param result The result to return to the client if default processing
+   * is bypassed. Can be modified. Will not be used if default processing
+   * is not bypassed.
    * @throws IOException if an error occurred on the coprocessor
    */
-  public List<KeyValue> postGet(final RegionCoprocessorEnvironment e, final Get get,
-      final List<KeyValue> results)
+  public void preGet(final RegionCoprocessorEnvironment e, final Get get,
+      final List<KeyValue> result)
+    throws IOException;
+
+  /**
+   * Called after the client performs a Get
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
+   * @param e the environment provided by the region server
+   * @param get the Get request
+   * @param result the result to return to the client, modify as necessary
+   * @throws IOException if an error occurred on the coprocessor
+   */
+  public void postGet(final RegionCoprocessorEnvironment e, final Get get,
+      final List<KeyValue> result)
     throws IOException;
 
   /**
    * Called before the client tests for existence using a Get.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param get the Get request
-   * @return the possibly transformed Get object by coprocessor
+   * @param exists
+   * @return the value to return to the client if bypassing default processing
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Get preExists(final RegionCoprocessorEnvironment e, final Get get)
+  public boolean preExists(final RegionCoprocessorEnvironment e, final Get get,
+      final boolean exists)
     throws IOException;
 
   /**
    * Called after the client tests for existence using a Get.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param get the Get request
    * @param exists the result returned by the region server
@@ -180,64 +213,92 @@ public interface RegionObserver extends Coprocessor {
 
   /**
    * Called before the client stores a value.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param familyMap map of family to edits for the given family.
-   * @return the possibly transformed map to actually use
+   * @param familyMap map of family to edits for the given family
+   * @param writeToWAL true if the change should be written to the WAL
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Map<byte[], List<KeyValue>> prePut(final RegionCoprocessorEnvironment e,
-      final Map<byte[], List<KeyValue>> familyMap)
+  public void prePut(final RegionCoprocessorEnvironment e, final Map<byte[],
+      List<KeyValue>> familyMap, final boolean writeToWAL)
     throws IOException;
 
   /**
    * Called after the client stores a value.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param familyMap map of family to edits for the given family.
+   * @param familyMap map of family to edits for the given family
+   * @param writeToWAL true if the change should be written to the WAL
    * @throws IOException if an error occurred on the coprocessor
    */
   public void postPut(final RegionCoprocessorEnvironment e, final Map<byte[],
-      List<KeyValue>> familyMap)
+      List<KeyValue>> familyMap, final boolean writeToWAL)
     throws IOException;
 
   /**
    * Called before the client deletes a value.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param familyMap map of family to edits for the given family.
-   * @return the possibly transformed map to actually use
+   * @param familyMap map of family to edits for the given family
+   * @param writeToWAL true if the change should be written to the WAL
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Map<byte[], List<KeyValue>> preDelete(final RegionCoprocessorEnvironment e,
-      final Map<byte[], List<KeyValue>> familyMap)
+  public void preDelete(final RegionCoprocessorEnvironment e, final Map<byte[],
+      List<KeyValue>> familyMap, final boolean writeToWAL)
     throws IOException;
 
   /**
    * Called after the client deletes a value.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param familyMap map of family to edits for the given family.
+   * @param familyMap map of family to edits for the given family
+   * @param writeToWAL true if the change should be written to the WAL
    * @throws IOException if an error occurred on the coprocessor
    */
   public void postDelete(final RegionCoprocessorEnvironment e,
-      final Map<byte[], List<KeyValue>> familyMap)
+      final Map<byte[], List<KeyValue>> familyMap, final boolean writeToWAL)
     throws IOException;
 
   /**
    * Called before checkAndPut
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
    * @param qualifier column qualifier
    * @param value the expected value
    * @param put data to put if check succeeds
-   * @return the possibly transformed map to actually use
+   * @param result 
+   * @return the return value to return to client if bypassing default
+   * processing
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Put preCheckAndPut(final RegionCoprocessorEnvironment e,
+  public boolean preCheckAndPut(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
-      final byte [] value, final Put put)
+      final byte [] value, final Put put, final boolean result)
     throws IOException;
 
   /**
    * Called after checkAndPut
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
@@ -245,7 +306,7 @@ public interface RegionObserver extends Coprocessor {
    * @param value the expected value
    * @param put data to put if check succeeds
    * @param result from the checkAndPut
-   * @return the possibly transformed value to return to client
+   * @return the possibly transformed return value to return to client
    * @throws IOException if an error occurred on the coprocessor
    */
   public boolean postCheckAndPut(final RegionCoprocessorEnvironment e,
@@ -254,23 +315,32 @@ public interface RegionObserver extends Coprocessor {
     throws IOException;
 
   /**
-   * Called before checkAndPut
+   * Called before checkAndDelete
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
    * @param qualifier column qualifier
    * @param value the expected value
    * @param delete delete to commit if check succeeds
-   * @return the possibly transformed map to actually use
+   * @param result 
+   * @return the value to return to client if bypassing default processing
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Delete preCheckAndDelete(final RegionCoprocessorEnvironment e,
+  public boolean preCheckAndDelete(final RegionCoprocessorEnvironment e,
       final byte [] row, final byte [] family, final byte [] qualifier,
-      final byte [] value, final Delete delete)
+      final byte [] value, final Delete delete, final boolean result)
     throws IOException;
 
   /**
    * Called after checkAndDelete
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
@@ -278,7 +348,7 @@ public interface RegionObserver extends Coprocessor {
    * @param value the expected value
    * @param delete delete to commit if check succeeds
    * @param result from the CheckAndDelete
-   * @return the possibly transformed value to return to client
+   * @return the possibly transformed returned value to return to client
    * @throws IOException if an error occurred on the coprocessor
    */
   public boolean postCheckAndDelete(final RegionCoprocessorEnvironment e,
@@ -288,13 +358,18 @@ public interface RegionObserver extends Coprocessor {
 
   /**
    * Called before incrementColumnValue
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
    * @param qualifier column qualifier
    * @param amount long amount to increment
-   * @param writeToWAL whether to write the increment to the WAL
-   * @return new amount to increment
+   * @param writeToWAL true if the change should be written to the WAL
+   * @return value to return to the client if bypassing default processing
    * @throws IOException if an error occurred on the coprocessor
    */
   public long preIncrementColumnValue(final RegionCoprocessorEnvironment e,
@@ -304,12 +379,15 @@ public interface RegionObserver extends Coprocessor {
 
   /**
    * Called after incrementColumnValue
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param row row to check
    * @param family column family
    * @param qualifier column qualifier
    * @param amount long amount to increment
-   * @param writeToWAL whether to write the increment to the WAL
+   * @param writeToWAL true if the change should be written to the WAL
    * @param result the result returned by incrementColumnValue
    * @return the result to return to the client
    * @throws IOException if an error occurred on the coprocessor
@@ -320,89 +398,135 @@ public interface RegionObserver extends Coprocessor {
     throws IOException;
 
   /**
-   * Called before incrementColumnValue
+   * Called before Increment
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param increment increment object
-   * @return new Increment instance
+   * @param result The result to return to the client if default processing
+   * is bypassed. Can be modified. Will not be used if default processing
+   * is not bypassed.
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Increment preIncrement(final RegionCoprocessorEnvironment e,
-      final Increment increment)
+  public void preIncrement(final RegionCoprocessorEnvironment e,
+      final Increment increment, final Result result)
     throws IOException;
 
   /**
    * Called after increment
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param increment increment object
-   * @param result the result returned by increment
-   * @return the result to return to the client
+   * @param result the result returned by increment, can be modified
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Result postIncrement(final RegionCoprocessorEnvironment e,
+  public void postIncrement(final RegionCoprocessorEnvironment e,
       final Increment increment, final Result result)
     throws IOException;
 
   /**
    * Called before the client opens a new scanner.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param scan the Scan specification
-   * @return the possibly transformed Scan to actually use
+   * @param s if not null, the base scanner
+   * @return an InternalScanner instance to use instead of the base scanner if
+   * overriding default behavior, null otherwise
    * @throws IOException if an error occurred on the coprocessor
    */
-  public Scan preScannerOpen(final RegionCoprocessorEnvironment e, final Scan scan)
+  public InternalScanner preScannerOpen(final RegionCoprocessorEnvironment e,
+      final Scan scan, final InternalScanner s)
     throws IOException;
 
   /**
    * Called after the client opens a new scanner.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
    * @param scan the Scan specification
-   * @param scannerId the scanner id allocated by the region server
+   * @param s if not null, the base scanner
+   * @return the scanner instance to use
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void postScannerOpen(final RegionCoprocessorEnvironment e, final Scan scan,
-      final long scannerId)
+  public InternalScanner postScannerOpen(final RegionCoprocessorEnvironment e,
+      final Scan scan, final InternalScanner s)
     throws IOException;
 
   /**
    * Called before the client asks for the next row on a scanner.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param scannerId the scanner id
-   * @return the possibly transformed result set to actually return
+   * @param s the scanner
+   * @param result The result to return to the client if default processing
+   * is bypassed. Can be modified. Will not be returned if default processing
+   * is not bypassed.
+   * @param limit the maximum number of results to return
+   * @param hasNext the 'has more' indication
+   * @return 'has more' indication that should be sent to client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public void preScannerNext(final RegionCoprocessorEnvironment e,
-      final long scannerId)
+  public boolean preScannerNext(final RegionCoprocessorEnvironment e,
+      final InternalScanner s, final List<KeyValue> result,
+      final int limit, final boolean hasNext)
     throws IOException;
 
   /**
    * Called after the client asks for the next row on a scanner.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param scannerId the scanner id
-   * @param results the result set returned by the region server
-   * @return the possibly transformed result set to actually return
+   * @param s the scanner
+   * @param result the result to return to the client, can be modified
+   * @param limit the maximum number of results to return
+   * @param hasNext the 'has more' indication
+   * @return 'has more' indication that should be sent to client
    * @throws IOException if an error occurred on the coprocessor
    */
-  public List<KeyValue> postScannerNext(final RegionCoprocessorEnvironment e,
-      final long scannerId, final List<KeyValue> results)
+  public boolean postScannerNext(final RegionCoprocessorEnvironment e,
+      final InternalScanner s, final List<KeyValue> result, final int limit,
+      final boolean hasNext)
     throws IOException;
 
   /**
    * Called before the client closes a scanner.
+   * <p>
+   * Call CoprocessorEnvironment#bypass to skip default actions
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param scannerId the scanner id
+   * @param s the scanner
    * @throws IOException if an error occurred on the coprocessor
    */
   public void preScannerClose(final RegionCoprocessorEnvironment e,
-      final long scannerId)
+      final InternalScanner s)
     throws IOException;
 
   /**
    * Called after the client closes a scanner.
+   * <p>
+   * Call CoprocessorEnvironment#complete to skip any subsequent chained
+   * coprocessors
    * @param e the environment provided by the region server
-   * @param scannerId the scanner id
+   * @param s the scanner
    * @throws IOException if an error occurred on the coprocessor
    */
   public void postScannerClose(final RegionCoprocessorEnvironment e,
-      final long scannerId)
+      final InternalScanner s)
     throws IOException;
 }

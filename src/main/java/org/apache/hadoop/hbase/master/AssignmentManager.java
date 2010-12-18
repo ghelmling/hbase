@@ -22,6 +22,7 @@ package org.apache.hadoop.hbase.master;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.EOFException;
 import java.net.ConnectException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -40,6 +41,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Chore;
+import org.apache.hadoop.hbase.HConstants;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.HServerAddress;
 import org.apache.hadoop.hbase.HServerInfo;
@@ -51,10 +53,9 @@ import org.apache.hadoop.hbase.catalog.CatalogTracker;
 import org.apache.hadoop.hbase.catalog.MetaReader;
 import org.apache.hadoop.hbase.catalog.RootLocationEditor;
 import org.apache.hadoop.hbase.client.Result;
-import org.apache.hadoop.hbase.executor.EventHandler.EventType;
 import org.apache.hadoop.hbase.executor.ExecutorService;
 import org.apache.hadoop.hbase.executor.RegionTransitionData;
-import org.apache.hadoop.hbase.master.AssignmentManager.RegionState;
+import org.apache.hadoop.hbase.executor.EventHandler.EventType;
 import org.apache.hadoop.hbase.master.LoadBalancer.RegionPlan;
 import org.apache.hadoop.hbase.master.handler.ClosedRegionHandler;
 import org.apache.hadoop.hbase.master.handler.OpenedRegionHandler;
@@ -65,9 +66,9 @@ import org.apache.hadoop.hbase.util.Threads;
 import org.apache.hadoop.hbase.zookeeper.ZKAssign;
 import org.apache.hadoop.hbase.zookeeper.ZKTable;
 import org.apache.hadoop.hbase.zookeeper.ZKUtil;
-import org.apache.hadoop.hbase.zookeeper.ZKUtil.NodeAndData;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperListener;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
+import org.apache.hadoop.hbase.zookeeper.ZKUtil.NodeAndData;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.zookeeper.AsyncCallback;
@@ -143,7 +144,7 @@ public class AssignmentManager extends ZooKeeperListener {
    * @param serverManager
    * @param catalogTracker
    * @param service
-   * @throws KeeperException 
+   * @throws KeeperException
    */
   public AssignmentManager(Server master, ServerManager serverManager,
       CatalogTracker catalogTracker, final ExecutorService service)
@@ -337,6 +338,11 @@ public class AssignmentManager extends ZooKeeperListener {
         LOG.warn("Unexpected NULL input " + data);
         return;
       }
+      // Check if this is a special HBCK transition
+      if (data.getServerName().equals(HConstants.HBCK_CODE_NAME)) {
+        handleHBCK(data);
+        return;
+      }
       // Verify this is a known server
       if (!serverManager.isServerOnline(data.getServerName()) &&
           !this.master.getServerName().equals(data.getServerName())) {
@@ -421,6 +427,45 @@ public class AssignmentManager extends ZooKeeperListener {
               this.serverManager.getServerInfo(data.getServerName())));
           break;
       }
+    }
+  }
+
+  /**
+   * Handle a ZK unassigned node transition triggered by HBCK repair tool.
+   * <p>
+   * This is handled in a separate code path because it breaks the normal rules.
+   * @param data
+   */
+  private void handleHBCK(RegionTransitionData data) {
+    String encodedName = HRegionInfo.encodeRegionName(data.getRegionName());
+    LOG.info("Handling HBCK triggered transition=" + data.getEventType() +
+      ", server=" + data.getServerName() + ", region=" +
+      HRegionInfo.prettyPrint(encodedName));
+    RegionState regionState = regionsInTransition.get(encodedName);
+    switch (data.getEventType()) {
+      case M_ZK_REGION_OFFLINE:
+        HRegionInfo regionInfo = null;
+        if (regionState != null) {
+          regionInfo = regionState.getRegion();
+        } else {
+          try {
+            regionInfo = MetaReader.getRegion(catalogTracker,
+                data.getRegionName()).getFirst();
+          } catch (IOException e) {
+            LOG.info("Exception reading META doing HBCK repair operation", e);
+            return;
+          }
+        }
+        LOG.info("HBCK repair is triggering assignment of region=" +
+            regionInfo.getRegionNameAsString());
+        // trigger assign, node is already in OFFLINE so don't need to update ZK
+        assign(regionInfo, false);
+        break;
+
+      default:
+        LOG.warn("Received unexpected region state from HBCK (" +
+            data.getEventType() + ")");
+        break;
     }
   }
 
@@ -1001,7 +1046,7 @@ public class AssignmentManager extends ZooKeeperListener {
   public void unassign(HRegionInfo region, boolean force) {
     LOG.debug("Starting unassignment of region " +
       region.getRegionNameAsString() + " (offlining)");
-    synchronized (this.regions) { 
+    synchronized (this.regions) {
       // Check if this region is currently assigned
       if (!regions.containsKey(region)) {
         LOG.debug("Attempted to unassign region " +
@@ -1059,6 +1104,10 @@ public class AssignmentManager extends ZooKeeperListener {
       // Presume that regionserver just failed and we haven't got expired
       // server from zk yet.  Let expired server deal with clean up.
     } catch (java.net.SocketTimeoutException e) {
+      LOG.info("Server " + server + " returned " + e.getMessage() + " for " +
+        region.getEncodedName());
+      // Presume retry or server will expire.
+    } catch (EOFException e) {
       LOG.info("Server " + server + " returned " + e.getMessage() + " for " +
         region.getEncodedName());
       // Presume retry or server will expire.
@@ -1610,9 +1659,9 @@ public class AssignmentManager extends ZooKeeperListener {
   /**
    * Process shutdown server removing any assignments.
    * @param hsi Server that went down.
-   * @return set of regions on this server that are not in transition
+   * @return list of regions in transition on this server
    */
-  public List<HRegionInfo> processServerShutdown(final HServerInfo hsi) {
+  public List<RegionState> processServerShutdown(final HServerInfo hsi) {
     // Clean out any existing assignment plans for this server
     synchronized (this.regionPlans) {
       for (Iterator <Map.Entry<String, RegionPlan>> i =
@@ -1628,7 +1677,7 @@ public class AssignmentManager extends ZooKeeperListener {
     // Remove this server from map of servers to regions, and remove all regions
     // of this server from online map of regions.
     Set<HRegionInfo> deadRegions = null;
-    List<HRegionInfo> rits = new ArrayList<HRegionInfo>();
+    List<RegionState> rits = new ArrayList<RegionState>();
     synchronized (this.regions) {
       List<HRegionInfo> assignedRegions = this.servers.remove(hsi);
       if (assignedRegions == null || assignedRegions.isEmpty()) {
@@ -1646,7 +1695,7 @@ public class AssignmentManager extends ZooKeeperListener {
     synchronized (regionsInTransition) {
       for (RegionState region : this.regionsInTransition.values()) {
         if (deadRegions.remove(region.getRegion())) {
-          rits.add(region.getRegion());
+          rits.add(region);
         }
       }
     }
