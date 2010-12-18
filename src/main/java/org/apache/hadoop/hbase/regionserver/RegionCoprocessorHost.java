@@ -53,22 +53,31 @@ import java.util.regex.Pattern;
 /**
  * Implements the coprocessor environment and runtime support.
  */
-public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvironment> {
+public class RegionCoprocessorHost
+    extends CoprocessorHost<RegionCoprocessorHost.RegionEnvironment> {
+
   private static final Log LOG = LogFactory.getLog(RegionCoprocessorHost.class);
 
   /**
    * Encapsulation of the environment of each coprocessor
    */
-  class RegionEnvironment extends CoprocessorHost.Environment
+  static class RegionEnvironment extends CoprocessorHost.Environment
       implements RegionCoprocessorEnvironment {
+
+    private HRegion region;
+    private RegionServerServices rsServices;
 
     /**
      * Constructor
      * @param impl the coprocessor instance
      * @param priority chaining priority
      */
-    public RegionEnvironment(final Coprocessor impl, Coprocessor.Priority priority) {
+    public RegionEnvironment(final Coprocessor impl,
+        Coprocessor.Priority priority, final HRegion region,
+        final RegionServerServices services) {
       super(impl, priority);
+      this.region = region;
+      this.rsServices = services;
     }
 
     /** @return the region */
@@ -145,7 +154,7 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   }
 
   @Override
-  public RegionCoprocessorEnvironment createEnvironment(
+  public RegionEnvironment createEnvironment(
       Class<?> implClass, Coprocessor instance, Coprocessor.Priority priority) {
     // Check if it's an Endpoint.
     // Due to current dynamic protocol design, Endpoint
@@ -159,7 +168,7 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       }
     }
 
-    return new RegionEnvironment(instance, priority);
+    return new RegionEnvironment(instance, priority, region, rsServices);
   }
 
   /**
@@ -169,10 +178,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     loadTableCoprocessors();
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preOpen(env);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -188,10 +197,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postOpen() {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postOpen(env);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -208,7 +217,7 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preClose(boolean abortRequested) {
     try {
       coprocessorLock.writeLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preClose(env, abortRequested);
         }
@@ -225,7 +234,7 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postClose(boolean abortRequested) {
     try {
       coprocessorLock.writeLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postClose(env, abortRequested);
         }
@@ -243,10 +252,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preCompact(boolean willSplit) {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preCompact(env, willSplit);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -263,10 +272,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postCompact(boolean willSplit) {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postCompact(env, willSplit);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -282,10 +291,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preFlush() {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preFlush(env);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -301,10 +310,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postFlush() {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postFlush(env);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -320,10 +329,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void preSplit() {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preSplit(env);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -341,10 +350,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   public void postSplit(HRegion l, HRegion r) {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postSplit(env, l, r);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -368,12 +377,12 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preGetClosestRowBefore(env, row, family,
             result);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -394,11 +403,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       final Result result) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postGetClosestRowBefore(env, row, family,
             result);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -418,11 +427,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preGet(env, get, results);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -443,10 +452,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postGet(env, get, results);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -467,11 +476,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       boolean exists = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           exists = ((RegionObserver)env.getInstance()).preExists(env, get, exists);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
         }
       }
@@ -492,10 +501,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           exists = ((RegionObserver)env.getInstance()).postExists(env, get, exists);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -517,11 +526,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).prePut(env, familyMap, writeToWAL);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -541,10 +550,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       final boolean writeToWAL) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postPut(env, familyMap, writeToWAL);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -565,11 +574,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preDelete(env, familyMap, writeToWAL);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -589,10 +598,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       final boolean writeToWAL) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postDelete(env, familyMap, writeToWAL);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -620,12 +629,12 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       boolean result = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).preCheckAndPut(env, row, family,
             qualifier, value, put, result);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -651,11 +660,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postCheckAndPut(env, row,
             family, qualifier, value, put, result);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -684,12 +693,12 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       boolean result = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).preCheckAndDelete(env, row,
             family, qualifier, value, delete, result);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -715,11 +724,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
   {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postCheckAndDelete(env, row,
             family, qualifier, value, delete, result);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
         }
       }
@@ -746,12 +755,12 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           amount = ((RegionObserver)env.getInstance()).preIncrementColumnValue(env,
               row, family, qualifier, amount, writeToWAL);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -777,11 +786,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       long result) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           result = ((RegionObserver)env.getInstance()).postIncrementColumnValue(env,
               row, family, qualifier, amount, writeToWAL, result);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -804,11 +813,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       Result result = new Result();
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preIncrement(env, increment, result);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -828,10 +837,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postIncrement(env, increment, result);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -852,11 +861,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       InternalScanner s = null;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           s = ((RegionObserver)env.getInstance()).preScannerOpen(env, scan, s);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -877,10 +886,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           s = ((RegionObserver)env.getInstance()).postScannerOpen(env, scan, s);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -905,12 +914,12 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       boolean bypass = false;
       boolean hasNext = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           hasNext = ((RegionObserver)env.getInstance()).preScannerNext(env, s, results,
             limit, hasNext);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -934,11 +943,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           hasMore = ((RegionObserver)env.getInstance()).postScannerNext(env, s,
             results, limit, hasMore);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -959,11 +968,11 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
     try {
       boolean bypass = false;
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).preScannerClose(env, s);
-          bypass |= ((RegionEnvironment)env).shouldBypass();
-          if (((RegionEnvironment)env).shouldComplete()) {
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
             break;
           }
         }
@@ -982,10 +991,10 @@ public class RegionCoprocessorHost extends CoprocessorHost<RegionCoprocessorEnvi
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (RegionCoprocessorEnvironment env: coprocessors) {
+      for (RegionEnvironment env: coprocessors) {
         if (env.getInstance() instanceof RegionObserver) {
           ((RegionObserver)env.getInstance()).postScannerClose(env, s);
-          if (((RegionEnvironment)env).shouldComplete()) {
+          if (env.shouldComplete()) {
             break;
           }
         }

@@ -54,16 +54,6 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
   protected final ReentrantReadWriteLock coprocessorLock = new ReentrantReadWriteLock();
   protected Set<E> coprocessors =
     new TreeSet<E>(new EnvironmentPriorityComparator());
-  static final ThreadLocal<Boolean> bypass = new ThreadLocal<Boolean>() {
-    @Override protected Boolean initialValue() {
-      return Boolean.FALSE;
-    }
-  };
-  static final ThreadLocal<Boolean> complete = new ThreadLocal<Boolean>() {
-    @Override protected Boolean initialValue() {
-      return Boolean.FALSE;
-    }
-  };
   // unique file prefix to use for local copies of jars when classloading
   protected String pathPrefix;
 
@@ -269,7 +259,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
   /**
    * Encapsulation of the environment of each coprocessor
    */
-  protected static class Environment implements CoprocessorEnvironment {
+  public static class Environment implements CoprocessorEnvironment {
 
     /**
      * A wrapper for HTable. Can be used to restrict privilege.
@@ -447,8 +437,6 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
 
     /** The coprocessor */
     public Coprocessor impl;
-    /** Environment variables */
-    protected Map<Object,Object> vars = new ConcurrentHashMap<Object,Object>();
     /** Chaining priority */
     protected Coprocessor.Priority priority = Coprocessor.Priority.USER;
     /** Current coprocessor state */
@@ -456,6 +444,16 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     /** Accounting for tables opened by the coprocessor */
     protected List<HTableInterface> openTables =
       Collections.synchronizedList(new ArrayList<HTableInterface>());
+    static final ThreadLocal<Boolean> bypass = new ThreadLocal<Boolean>() {
+      @Override protected Boolean initialValue() {
+        return Boolean.FALSE;
+      }
+    };
+    static final ThreadLocal<Boolean> complete = new ThreadLocal<Boolean>() {
+      @Override protected Boolean initialValue() {
+        return Boolean.FALSE;
+      }
+    };
 
     /**
      * Constructor

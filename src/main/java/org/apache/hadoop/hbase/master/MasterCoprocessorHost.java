@@ -26,13 +26,17 @@ import org.apache.hadoop.hbase.coprocessor.*;
 
 import java.io.IOException;
 
-public class MasterCoprocessorHost extends CoprocessorHost<MasterCoprocessorEnvironment> {
-  private class MasterEnvironment extends CoprocessorHost.Environment
+public class MasterCoprocessorHost
+    extends CoprocessorHost<MasterCoprocessorEnvironment> {
+
+  private static class MasterEnvironment extends CoprocessorHost.Environment
       implements MasterCoprocessorEnvironment {
+    private MasterServices masterServices;
 
     public MasterEnvironment(Class<?> implClass, Coprocessor impl,
-        Coprocessor.Priority priority) {
+        Coprocessor.Priority priority, MasterServices services) {
       super(impl, priority);
+      this.masterServices = services;
     }
 
     public MasterServices getMasterServices() {
@@ -51,7 +55,7 @@ public class MasterCoprocessorHost extends CoprocessorHost<MasterCoprocessorEnvi
   @Override
   public MasterCoprocessorEnvironment createEnvironment(Class<?> implClass,
       Coprocessor instance, Coprocessor.Priority priority) {
-    return new MasterEnvironment(implClass, instance, priority);
+    return new MasterEnvironment(implClass, instance, priority, masterServices);
   }
 
   /* Implementation of hooks for invoking MasterObservers */
