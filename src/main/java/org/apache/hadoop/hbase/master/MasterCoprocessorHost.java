@@ -201,13 +201,13 @@ public class MasterCoprocessorHost
     }
   }
 
-  HColumnDescriptor preModifyColumn(byte [] tableName, HColumnDescriptor descriptor)
+  void preModifyColumn(byte [] tableName, HColumnDescriptor descriptor)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
       for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          descriptor = ((MasterObserver)env.getInstance()).preModifyColumn(
+          ((MasterObserver)env.getInstance()).preModifyColumn(
               env, tableName, descriptor);
           if (env.shouldComplete()) {
             break;
@@ -217,7 +217,6 @@ public class MasterCoprocessorHost
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return descriptor;
   }
 
   void postModifyColumn(byte [] tableName, HColumnDescriptor descriptor)
@@ -372,13 +371,15 @@ public class MasterCoprocessorHost
     }
   }
 
-  void preAssign(final byte [] regionName, final boolean force)
+  boolean preAssign(final byte [] regionName, final boolean force)
       throws IOException {
+    boolean bypass = false;
     try {
       coprocessorLock.readLock().lock();
       for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preAssign(env, regionName, force);
+          bypass |= env.shouldBypass();
           if (env.shouldComplete()) {
             break;
           }
@@ -387,6 +388,7 @@ public class MasterCoprocessorHost
     } finally {
       coprocessorLock.readLock().unlock();
     }
+    return bypass;
   }
 
   void postAssign(final HRegionInfo regionInfo) throws IOException {
@@ -405,14 +407,16 @@ public class MasterCoprocessorHost
     }
   }
 
-  void preUnassign(final byte [] regionName, final boolean force)
+  boolean preUnassign(final byte [] regionName, final boolean force)
       throws IOException {
+    boolean bypass = false;
     try {
       coprocessorLock.readLock().lock();
       for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preUnassign(
               env, regionName, force);
+          bypass |= env.shouldBypass();
           if (env.shouldComplete()) {
             break;
           }
@@ -421,6 +425,7 @@ public class MasterCoprocessorHost
     } finally {
       coprocessorLock.readLock().unlock();
     }
+    return bypass;
   }
 
   void postUnassign(final HRegionInfo regionInfo, final boolean force)

@@ -118,7 +118,7 @@ public class RegionCoprocessorHost
     this.pathPrefix = this.region.getRegionNameAsString().replace(',', '_');
 
     // load system default cp's from configuration.
-    loadSystemCoprocessors(conf);
+    loadSystemCoprocessors(conf, REGION_COPROCESSOR_CONF_KEY);
 
     // load Coprocessor From HDFS
     loadTableCoprocessors();

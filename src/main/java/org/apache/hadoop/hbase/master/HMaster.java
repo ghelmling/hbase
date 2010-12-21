@@ -725,14 +725,15 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   @Override
   public boolean balanceSwitch(final boolean b) {
     boolean oldValue = this.balanceSwitch;
+    boolean newValue = b;
     try {
       if (this.cpHost != null) {
-        this.cpHost.preBalanceSwitch(b);
+        newValue = this.cpHost.preBalanceSwitch(newValue);
       }
-      this.balanceSwitch = b;
-      LOG.info("Balance=" + b);
+      this.balanceSwitch = newValue;
+      LOG.info("Balance=" + newValue);
       if (this.cpHost != null) {
-        this.cpHost.postBalanceSwitch(oldValue, b);
+        this.cpHost.postBalanceSwitch(oldValue, newValue);
       }
     } catch (IOException ioe) {
       LOG.warn("Error flipping balance switch", ioe);
@@ -1119,7 +1120,9 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   public void assign(final byte [] regionName, final boolean force)
   throws IOException {
     if (cpHost != null) {
-      cpHost.preAssign(regionName, force);
+      if (cpHost.preAssign(regionName, force)) {
+        return;
+      }
     }
     Pair<HRegionInfo, HServerAddress> pair =
       MetaReader.getRegion(this.catalogTracker, regionName);
@@ -1138,7 +1141,9 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   public void unassign(final byte [] regionName, final boolean force)
   throws IOException {
     if (cpHost != null) {
-      cpHost.preUnassign(regionName, force);
+      if (cpHost.preUnassign(regionName, force)) {
+        return;
+      }
     }
     Pair<HRegionInfo, HServerAddress> pair =
       MetaReader.getRegion(this.catalogTracker, regionName);

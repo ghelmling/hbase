@@ -70,9 +70,8 @@ public class BaseMasterObserver implements MasterObserver {
   }
 
   @Override
-  public HColumnDescriptor preModifyColumn(MasterCoprocessorEnvironment env,
+  public void preModifyColumn(MasterCoprocessorEnvironment env,
       byte[] tableName, HColumnDescriptor descriptor) throws IOException {
-    return null;
   }
 
   @Override
@@ -153,7 +152,7 @@ public class BaseMasterObserver implements MasterObserver {
   @Override
   public boolean preBalanceSwitch(MasterCoprocessorEnvironment env, boolean b)
       throws IOException {
-    return false;
+    return b;
   }
 
   @Override

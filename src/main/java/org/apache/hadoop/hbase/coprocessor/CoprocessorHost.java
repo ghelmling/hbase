@@ -30,9 +30,6 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
-import org.apache.hadoop.hbase.regionserver.HRegion;
-import org.apache.hadoop.hbase.regionserver.RegionCoprocessorHost;
-import org.apache.hadoop.hbase.regionserver.RegionServerServices;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.VersionInfo;
 
@@ -41,7 +38,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
@@ -51,8 +47,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * provides
  */
 public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
-  public static final String DEFAULT_COPROCESSOR_CONF_KEY =
-      "hbase.coprocessor.default.classes";
+  public static final String REGION_COPROCESSOR_CONF_KEY =
+      "hbase.coprocessor.region.classes";
   public static final String MASTER_COPROCESSOR_CONF_KEY =
       "hbase.coprocessor.master.classes";
   private static final Log LOG = LogFactory.getLog(CoprocessorHost.class);
@@ -65,14 +61,6 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
 
   public CoprocessorHost() {
     pathPrefix = UUID.randomUUID().toString();
-  }
-
-  /**
-   * Load system coprocessors. Read the class names from configuration.
-   * Called by constructor.
-   */
-  protected void loadSystemCoprocessors(Configuration conf) {
-    loadSystemCoprocessors(conf, DEFAULT_COPROCESSOR_CONF_KEY);
   }
 
   /**
@@ -232,12 +220,8 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
     try {
       coprocessorLock.readLock().lock();
       for (E env: coprocessors) {
-        if (env.getInstance().getClass().getName().equals(className)) {
-          return env.getInstance();
-        }
-      }
-      for (E env: coprocessors) {
-        if (env.getInstance().getClass().getName().endsWith(className)) {
+        if (env.getInstance().getClass().getName().equals(className) ||
+            env.getInstance().getClass().getSimpleName().equals(className)) {
           return env.getInstance();
         }
       }

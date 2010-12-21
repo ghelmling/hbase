@@ -152,10 +152,9 @@ public class TestMasterObserver {
     }
 
     @Override
-    public HColumnDescriptor preModifyColumn(MasterCoprocessorEnvironment env,
+    public void preModifyColumn(MasterCoprocessorEnvironment env,
         byte[] tableName, HColumnDescriptor descriptor) throws IOException {
       preModifyColumnCalled = true;
-      return descriptor;
     }
 
     @Override

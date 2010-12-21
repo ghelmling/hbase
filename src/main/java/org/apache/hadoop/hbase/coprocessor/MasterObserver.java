@@ -89,7 +89,7 @@ public interface MasterObserver extends Coprocessor {
   /**
    * Called prior to modifying a column family's attributes.
    */
-  HColumnDescriptor preModifyColumn(MasterCoprocessorEnvironment env,
+  void preModifyColumn(MasterCoprocessorEnvironment env,
       byte [] tableName, HColumnDescriptor descriptor) throws IOException;
 
   /**
