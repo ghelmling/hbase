@@ -44,6 +44,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.replication.ReplicationAdmin;
 import org.apache.hadoop.hbase.mapreduce.replication.VerifyReplication;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.JVMClusterUtil;
 import org.apache.hadoop.hbase.zookeeper.MiniZooKeeperCluster;
 import org.apache.hadoop.hbase.zookeeper.ZooKeeperWatcher;
 import org.apache.hadoop.mapreduce.Job;
@@ -71,6 +72,8 @@ public class TestReplication {
   private static HBaseTestingUtility utility1;
   private static HBaseTestingUtility utility2;
   private static final int NB_ROWS_IN_BATCH = 100;
+  private static final int NB_ROWS_IN_BIG_BATCH =
+      NB_ROWS_IN_BATCH * 10;
   private static final long SLEEP_TIME = 500;
   private static final int NB_RETRIES = 10;
 
@@ -126,7 +129,6 @@ public class TestReplication {
     utility2.startMiniCluster(2);
 
     HTableDescriptor table = new HTableDescriptor(tableName);
-    table.setDeferredLogFlush(false);
     HColumnDescriptor fam = new HColumnDescriptor(famName);
     fam.setScope(HConstants.REPLICATION_SCOPE_GLOBAL);
     table.addFamily(fam);
@@ -153,8 +155,15 @@ public class TestReplication {
    */
   @Before
   public void setUp() throws Exception {
+
+    // Starting and stopping replication can make us miss new logs,
+    // rolling like this makes sure the most recent one gets added to the queue
+    for ( JVMClusterUtil.RegionServerThread r :
+        utility1.getHBaseCluster().getRegionServerThreads()) {
+      r.getRegionServer().getWAL().rollWriter();
+    }
     utility1.truncateTable(tableName);
-    // truncating the table will send on Delete per row to the slave cluster
+    // truncating the table will send one Delete per row to the slave cluster
     // in an async fashion, which is why we cannot just call truncateTable on
     // utility2 since late writes could make it to the slave in some way.
     // Instead, we truncate the first table and wait for all the Deletes to
@@ -166,12 +175,13 @@ public class TestReplication {
         fail("Waited too much time for truncate");
       }
       ResultScanner scanner = htable2.getScanner(scan);
-      Result[] res = scanner.next(NB_ROWS_IN_BATCH);
+      Result[] res = scanner.next(NB_ROWS_IN_BIG_BATCH);
       scanner.close();
       if (res.length != 0) {
        if (lastCount < res.length) {
           i--; // Don't increment timeout if we make progress
         }
+        lastCount = res.length;
         LOG.info("Still got " + res.length + " rows");
         Thread.sleep(SLEEP_TIME);
       } else {
@@ -409,7 +419,7 @@ public class TestReplication {
   public void loadTesting() throws Exception {
     htable1.setWriteBufferSize(1024);
     htable1.setAutoFlush(false);
-    for (int i = 0; i < NB_ROWS_IN_BATCH *10; i++) {
+    for (int i = 0; i < NB_ROWS_IN_BIG_BATCH; i++) {
       Put put = new Put(Bytes.toBytes(i));
       put.add(famName, row, row);
       htable1.put(put);
@@ -419,7 +429,7 @@ public class TestReplication {
     Scan scan = new Scan();
 
     ResultScanner scanner = htable1.getScanner(scan);
-    Result[] res = scanner.next(NB_ROWS_IN_BATCH * 100);
+    Result[] res = scanner.next(NB_ROWS_IN_BIG_BATCH);
     scanner.close();
 
     assertEquals(NB_ROWS_IN_BATCH *10, res.length);
@@ -429,9 +439,9 @@ public class TestReplication {
     for (int i = 0; i < NB_RETRIES; i++) {
 
       scanner = htable2.getScanner(scan);
-      res = scanner.next(NB_ROWS_IN_BATCH * 100);
+      res = scanner.next(NB_ROWS_IN_BIG_BATCH);
       scanner.close();
-      if (res.length != NB_ROWS_IN_BATCH *10) {
+      if (res.length != NB_ROWS_IN_BIG_BATCH) {
         if (i == NB_RETRIES-1) {
           int lastRow = -1;
           for (Result result : res) {
@@ -443,7 +453,7 @@ public class TestReplication {
           }
           LOG.error("Last row: " + lastRow);
           fail("Waited too much time for normal batch replication, "
-              + res.length + " instead of " + NB_ROWS_IN_BATCH *10);
+              + res.length + " instead of " + NB_ROWS_IN_BIG_BATCH);
         } else {
           LOG.info("Only got " + res.length + " rows");
           Thread.sleep(SLEEP_TIME);

@@ -41,6 +41,7 @@ import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.Store;
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogSplitter;
+import org.apache.hadoop.hbase.regionserver.wal.OrphanHLogAfterSplitException;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.FSUtils;
 
@@ -189,8 +190,14 @@ public class MasterFileSystem {
     long splitTime = 0, splitLogSize = 0;
     Path logDir = new Path(this.rootdir, HLog.getHLogDirectoryName(serverName));
     try {
-      HLogSplitter splitter = HLogSplitter.createLogSplitter(conf);
-      splitter.splitLog(this.rootdir, logDir, oldLogDir, this.fs, conf);
+      HLogSplitter splitter = HLogSplitter.createLogSplitter(
+        conf, rootdir, logDir, oldLogDir, this.fs);
+      try {
+        splitter.splitLog();
+      } catch (OrphanHLogAfterSplitException e) {
+        LOG.warn("Retrying splitting because of:", e);
+        splitter.splitLog();
+      }
       splitTime = splitter.getTime();
       splitLogSize = splitter.getSize();
     } catch (IOException e) {

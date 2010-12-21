@@ -493,6 +493,13 @@ public class HLog implements Syncable {
         nextHdfsOut =
           ((SequenceFileLogWriter)nextWriter).getDFSCOutputStream();
       }
+      // Tell our listeners that a new log was created
+      if (!this.listeners.isEmpty()) {
+        for (WALObserver i : this.listeners) {
+          i.logRolled(newPath);
+        }
+      }
+
       synchronized (updateLock) {
         // Clean up current writer.
         Path oldFile = cleanupCurrentWriter(currentFilenum);
@@ -508,12 +515,6 @@ public class HLog implements Syncable {
           "New hlog " + FSUtils.getPath(newPath));
         this.numEntries.set(0);
         this.logRollRequested = false;
-      }
-      // Tell our listeners that a new log was created
-      if (!this.listeners.isEmpty()) {
-        for (WALObserver i : this.listeners) {
-          i.logRolled(newPath);
-        }
       }
       // Can we delete any of the old log files?
       if (this.outputfiles.size() > 0) {
@@ -1438,8 +1439,9 @@ public class HLog implements Syncable {
       throw new IOException(p + " is not a directory");
     }
 
-    HLogSplitter logSplitter = HLogSplitter.createLogSplitter(conf);
-    logSplitter.splitLog(baseDir, p, oldLogDir, fs, conf);
+    HLogSplitter logSplitter = HLogSplitter.createLogSplitter(
+        conf, baseDir, p, oldLogDir, fs);
+    logSplitter.splitLog();
   }
 
   /**
