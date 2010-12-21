@@ -44,6 +44,12 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
+/**
+ * Provides the common setup framework and runtime services for coprocessor
+ * invocation from HBase services.
+ * @param <E> the specific environment extension that a concrete implementation
+ * provides
+ */
 public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
   public static final String DEFAULT_COPROCESSOR_CONF_KEY =
       "hbase.coprocessor.default.classes";

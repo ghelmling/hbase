@@ -51,7 +51,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Implements the coprocessor environment and runtime support.
+ * Implements the coprocessor environment and runtime support for coprocessors
+ * loaded within a {@link HRegion}.
  */
 public class RegionCoprocessorHost
     extends CoprocessorHost<RegionCoprocessorHost.RegionEnvironment> {
