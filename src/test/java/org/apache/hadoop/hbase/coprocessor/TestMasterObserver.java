@@ -74,6 +74,10 @@ public class TestMasterObserver {
     private boolean postDisableTableCalled;
     private boolean preMoveCalled;
     private boolean postMoveCalled;
+    private boolean preAssignCalled;
+    private boolean postAssignCalled;
+    private boolean preUnassignCalled;
+    private boolean postUnassignCalled;
     private boolean preBalanceCalled;
     private boolean postBalanceCalled;
     private boolean preBalanceSwitchCalled;
@@ -84,10 +88,9 @@ public class TestMasterObserver {
     private boolean stopCalled;
 
     @Override
-    public HTableDescriptor preCreateTable(MasterCoprocessorEnvironment env,
+    public void preCreateTable(MasterCoprocessorEnvironment env,
         HTableDescriptor desc, byte[][] splitKeys) throws IOException {
       preCreateTableCalled = true;
-      return desc;
     }
 
     @Override
@@ -117,10 +120,9 @@ public class TestMasterObserver {
     }
 
     @Override
-    public HTableDescriptor preModifyTable(MasterCoprocessorEnvironment env,
+    public void preModifyTable(MasterCoprocessorEnvironment env,
         byte[] tableName, HTableDescriptor htd) throws IOException {
       preModifyTableCalled = true;
-      return htd;
     }
 
     @Override
@@ -134,10 +136,9 @@ public class TestMasterObserver {
     }
 
     @Override
-    public HColumnDescriptor preAddColumn(MasterCoprocessorEnvironment env,
+    public void preAddColumn(MasterCoprocessorEnvironment env,
         byte[] tableName, HColumnDescriptor column) throws IOException {
       preAddColumnCalled = true;
-      return column;
     }
 
     @Override
@@ -234,6 +235,38 @@ public class TestMasterObserver {
     }
 
     @Override
+    public void preAssign(MasterCoprocessorEnvironment env,
+        final byte [] regionName, final boolean force) throws IOException {
+      preAssignCalled = true;
+    }
+
+    @Override
+    public void postAssign(MasterCoprocessorEnvironment env,
+        final HRegionInfo regionInfo) throws IOException {
+      postAssignCalled = true;
+    }
+
+    public boolean wasAssignCalled() {
+      return preAssignCalled && postAssignCalled;
+    }
+
+    @Override
+    public void preUnassign(MasterCoprocessorEnvironment env,
+        final byte [] regionName, final boolean force) throws IOException {
+      preUnassignCalled = true;
+    }
+
+    @Override
+    public void postUnassign(MasterCoprocessorEnvironment env,
+        final HRegionInfo regionInfo, final boolean force) throws IOException {
+      postUnassignCalled = true;
+    }
+
+    public boolean wasUnassignCalled() {
+      return preUnassignCalled && postUnassignCalled;
+    }
+
+    @Override
     public void preBalance(MasterCoprocessorEnvironment env)
         throws IOException {
       preBalanceCalled = true;
@@ -257,8 +290,8 @@ public class TestMasterObserver {
     }
 
     @Override
-    public void postBalanceSwitch(MasterCoprocessorEnvironment env, boolean b)
-        throws IOException {
+    public void postBalanceSwitch(MasterCoprocessorEnvironment env,
+        boolean oldValue, boolean newValue) throws IOException {
       postBalanceSwitchCalled = true;
     }
 

@@ -26,10 +26,19 @@ import org.apache.hadoop.hbase.coprocessor.*;
 
 import java.io.IOException;
 
+/**
+ * Provides the coprocessor framework and environment for master oriented
+ * operations.  {@link HMaster} interacts with the loaded coprocessors
+ * through this class.
+ */
 public class MasterCoprocessorHost
-    extends CoprocessorHost<MasterCoprocessorEnvironment> {
+    extends CoprocessorHost<MasterCoprocessorHost.MasterEnvironment> {
 
-  private static class MasterEnvironment extends CoprocessorHost.Environment
+  /**
+   * Coprocessor environment extension providing access to master related
+   * services.
+   */
+  static class MasterEnvironment extends CoprocessorHost.Environment
       implements MasterCoprocessorEnvironment {
     private MasterServices masterServices;
 
@@ -53,34 +62,38 @@ public class MasterCoprocessorHost
   }
 
   @Override
-  public MasterCoprocessorEnvironment createEnvironment(Class<?> implClass,
+  public MasterEnvironment createEnvironment(Class<?> implClass,
       Coprocessor instance, Coprocessor.Priority priority) {
     return new MasterEnvironment(implClass, instance, priority, masterServices);
   }
 
   /* Implementation of hooks for invoking MasterObservers */
-  HTableDescriptor preCreateTable(HTableDescriptor desc, byte[][] splitKeys)
+  void preCreateTable(HTableDescriptor desc, byte[][] splitKeys)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          desc = ((MasterObserver)env.getInstance()).preCreateTable(env, desc, splitKeys);
+          ((MasterObserver)env.getInstance()).preCreateTable(env, desc, splitKeys);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
       coprocessorLock.readLock().unlock();
     }
-
-    return desc;
   }
 
   void postCreateTable(HRegionInfo[] regions, boolean sync) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postCreateTable(env, regions, sync);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -91,9 +104,12 @@ public class MasterCoprocessorHost
   void preDeleteTable(byte[] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preDeleteTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -104,9 +120,12 @@ public class MasterCoprocessorHost
   void postDeleteTable(byte[] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postDeleteTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -114,28 +133,33 @@ public class MasterCoprocessorHost
     }
   }
 
-  HTableDescriptor preModifyTable(final byte[] tableName, HTableDescriptor htd)
+  void preModifyTable(final byte[] tableName, HTableDescriptor htd)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          htd = ((MasterObserver)env.getInstance()).preModifyTable(env, tableName, htd);
+          ((MasterObserver)env.getInstance()).preModifyTable(env, tableName, htd);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return htd;
   }
 
   void postModifyTable(final byte[] tableName, HTableDescriptor htd)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postModifyTable(env, tableName, htd);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -143,28 +167,33 @@ public class MasterCoprocessorHost
     }
   }
 
-  HColumnDescriptor preAddColumn(byte [] tableName, HColumnDescriptor column)
+  void preAddColumn(byte [] tableName, HColumnDescriptor column)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          column = ((MasterObserver)env.getInstance()).preAddColumn(env, tableName, column);
+          ((MasterObserver)env.getInstance()).preAddColumn(env, tableName, column);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
       coprocessorLock.readLock().unlock();
     }
-    return column;
   }
 
   void postAddColumn(byte [] tableName, HColumnDescriptor column)
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postAddColumn(env, tableName, column);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -176,9 +205,13 @@ public class MasterCoprocessorHost
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          descriptor = ((MasterObserver)env.getInstance()).preModifyColumn(env, tableName, descriptor);
+          descriptor = ((MasterObserver)env.getInstance()).preModifyColumn(
+              env, tableName, descriptor);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -191,9 +224,13 @@ public class MasterCoprocessorHost
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          ((MasterObserver)env.getInstance()).postModifyColumn(env, tableName, descriptor);
+          ((MasterObserver)env.getInstance()).postModifyColumn(
+              env, tableName, descriptor);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -205,9 +242,12 @@ public class MasterCoprocessorHost
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preDeleteColumn(env, tableName, c);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -219,9 +259,12 @@ public class MasterCoprocessorHost
       throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postDeleteColumn(env, tableName, c);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -232,9 +275,12 @@ public class MasterCoprocessorHost
   void preEnableTable(final byte [] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preEnableTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -245,9 +291,12 @@ public class MasterCoprocessorHost
   void postEnableTable(final byte [] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postEnableTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -258,9 +307,12 @@ public class MasterCoprocessorHost
   void preDisableTable(final byte [] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preDisableTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -271,9 +323,12 @@ public class MasterCoprocessorHost
   void postDisableTable(final byte [] tableName) throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postDisableTable(env, tableName);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -285,10 +340,13 @@ public class MasterCoprocessorHost
       throws UnknownRegionException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preMove(
               env, region, srcServer, destServer);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -300,10 +358,13 @@ public class MasterCoprocessorHost
       throws UnknownRegionException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postMove(
               env, region, srcServer, destServer);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -311,14 +372,89 @@ public class MasterCoprocessorHost
     }
   }
 
-  void preBalance() throws IOException {
+  void preAssign(final byte [] regionName, final boolean force)
+      throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          ((MasterObserver)env.getInstance()).preBalance(env);
+          ((MasterObserver)env.getInstance()).preAssign(env, regionName, force);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  void postAssign(final HRegionInfo regionInfo) throws IOException {
+    try {
+      coprocessorLock.readLock().lock();
+      for (MasterEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof MasterObserver) {
+          ((MasterObserver)env.getInstance()).postAssign(env, regionInfo);
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  void preUnassign(final byte [] regionName, final boolean force)
+      throws IOException {
+    try {
+      coprocessorLock.readLock().lock();
+      for (MasterEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof MasterObserver) {
+          ((MasterObserver)env.getInstance()).preUnassign(
+              env, regionName, force);
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  void postUnassign(final HRegionInfo regionInfo, final boolean force)
+      throws IOException {
+    try {
+      coprocessorLock.readLock().lock();
+      for (MasterEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof MasterObserver) {
+          ((MasterObserver)env.getInstance()).postUnassign(
+              env, regionInfo, force);
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+    } finally {
+      coprocessorLock.readLock().unlock();
+    }
+  }
+
+  boolean preBalance() throws IOException {
+    try {
+      boolean bypass = false;
+      coprocessorLock.readLock().lock();
+      for (MasterEnvironment env: coprocessors) {
+        if (env.getInstance() instanceof MasterObserver) {
+          ((MasterObserver)env.getInstance()).preBalance(env);
+          bypass |= env.shouldBypass();
+          if (env.shouldComplete()) {
+            break;
+          }
+        }
+      }
+      return bypass;
     } finally {
       coprocessorLock.readLock().unlock();
     }
@@ -327,9 +463,12 @@ public class MasterCoprocessorHost
   void postBalance() throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).postBalance(env);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -341,9 +480,13 @@ public class MasterCoprocessorHost
     boolean balance = b;
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          balance = ((MasterObserver)env.getInstance()).preBalanceSwitch(env, balance);
+          balance = ((MasterObserver)env.getInstance()).preBalanceSwitch(
+              env, balance);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -352,12 +495,17 @@ public class MasterCoprocessorHost
     return balance;
   }
 
-  void postBalanceSwitch(final boolean b) throws IOException {
+  void postBalanceSwitch(final boolean oldValue, final boolean newValue)
+      throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
-          ((MasterObserver)env.getInstance()).postBalanceSwitch(env, b);
+          ((MasterObserver)env.getInstance()).postBalanceSwitch(
+              env, oldValue, newValue);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -368,9 +516,12 @@ public class MasterCoprocessorHost
   void preShutdown() throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preShutdown(env);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {
@@ -381,9 +532,12 @@ public class MasterCoprocessorHost
   void preStopMaster() throws IOException {
     try {
       coprocessorLock.readLock().lock();
-      for (MasterCoprocessorEnvironment env: coprocessors) {
+      for (MasterEnvironment env: coprocessors) {
         if (env.getInstance() instanceof MasterObserver) {
           ((MasterObserver)env.getInstance()).preStopMaster(env);
+          if (env.shouldComplete()) {
+            break;
+          }
         }
       }
     } finally {

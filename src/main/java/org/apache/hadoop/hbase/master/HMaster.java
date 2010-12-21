@@ -683,7 +683,10 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
 
       if (this.cpHost != null) {
         try {
-          this.cpHost.preBalance();
+          if (this.cpHost.preBalance()) {
+            LOG.debug("Coprocessor bypassing balancer request");
+            return false;
+          }
         } catch (IOException ioe) {
           LOG.error("Error invoking master coprocessor preBalance()", ioe);
           return false;
@@ -729,7 +732,7 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
       this.balanceSwitch = b;
       LOG.info("Balance=" + b);
       if (this.cpHost != null) {
-        this.cpHost.postBalanceSwitch(b);
+        this.cpHost.postBalanceSwitch(oldValue, b);
       }
     } catch (IOException ioe) {
       LOG.warn("Error flipping balance switch", ioe);
@@ -1115,10 +1118,16 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   @Override
   public void assign(final byte [] regionName, final boolean force)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preAssign(regionName, force);
+    }
     Pair<HRegionInfo, HServerAddress> pair =
       MetaReader.getRegion(this.catalogTracker, regionName);
     if (pair == null) throw new UnknownRegionException(Bytes.toString(regionName));
     assignRegion(pair.getFirst());
+    if (cpHost != null) {
+      cpHost.postAssign(pair.getFirst());
+    }
   }
 
   public void assignRegion(HRegionInfo hri) {
@@ -1128,12 +1137,18 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   @Override
   public void unassign(final byte [] regionName, final boolean force)
   throws IOException {
+    if (cpHost != null) {
+      cpHost.preUnassign(regionName, force);
+    }
     Pair<HRegionInfo, HServerAddress> pair =
       MetaReader.getRegion(this.catalogTracker, regionName);
     if (pair == null) throw new UnknownRegionException(Bytes.toString(regionName));
     HRegionInfo hri = pair.getFirst();
     if (force) this.assignmentManager.clearRegionFromTransition(hri);
     this.assignmentManager.unassign(hri, force);
+    if (cpHost != null) {
+      cpHost.postUnassign(hri, force);
+    }
   }
 
   /**

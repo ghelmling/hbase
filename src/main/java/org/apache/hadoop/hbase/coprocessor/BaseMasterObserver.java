@@ -30,9 +30,8 @@ import java.io.IOException;
 
 public class BaseMasterObserver implements MasterObserver {
   @Override
-  public HTableDescriptor preCreateTable(MasterCoprocessorEnvironment env,
+  public void preCreateTable(MasterCoprocessorEnvironment env,
       HTableDescriptor desc, byte[][] splitKeys) throws IOException {
-    return null;
   }
 
   @Override
@@ -51,9 +50,8 @@ public class BaseMasterObserver implements MasterObserver {
   }
 
   @Override
-  public HTableDescriptor preModifyTable(MasterCoprocessorEnvironment env,
+  public void preModifyTable(MasterCoprocessorEnvironment env,
       byte[] tableName, HTableDescriptor htd) throws IOException {
-    return null;
   }
 
   @Override
@@ -62,9 +60,8 @@ public class BaseMasterObserver implements MasterObserver {
   }
 
   @Override
-  public HColumnDescriptor preAddColumn(MasterCoprocessorEnvironment env,
+  public void preAddColumn(MasterCoprocessorEnvironment env,
       byte[] tableName, HColumnDescriptor column) throws IOException {
-    return null;
   }
 
   @Override
@@ -126,6 +123,26 @@ public class BaseMasterObserver implements MasterObserver {
   }
 
   @Override
+  public void preAssign(MasterCoprocessorEnvironment env, byte[] regionName,
+      boolean force) throws IOException {
+  }
+
+  @Override
+  public void postAssign(MasterCoprocessorEnvironment env,
+      HRegionInfo regionInfo) throws IOException {
+  }
+
+  @Override
+  public void preUnassign(MasterCoprocessorEnvironment env, byte[] regionName,
+      boolean force) throws IOException {
+  }
+
+  @Override
+  public void postUnassign(MasterCoprocessorEnvironment env,
+      HRegionInfo regionInfo, boolean force) throws IOException {
+  }
+
+  @Override
   public void preBalance(MasterCoprocessorEnvironment env) throws IOException {
   }
 
@@ -140,8 +157,8 @@ public class BaseMasterObserver implements MasterObserver {
   }
 
   @Override
-  public void postBalanceSwitch(MasterCoprocessorEnvironment env, boolean b)
-      throws IOException {
+  public void postBalanceSwitch(MasterCoprocessorEnvironment env,
+      boolean oldValue, boolean newValue) throws IOException {
   }
 
   @Override
