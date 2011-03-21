@@ -8,212 +8,16 @@
    -->
 
   <parent>
-    <groupId>org.apache</groupId>
-    <artifactId>apache</artifactId>
-    <version>8</version>
+    <groupId>org.apache.hbase</groupId>
+    <artifactId>hbase</artifactId>
+    <version>0.91.0-security-SNAPSHOT</version>
   </parent>
 
   <groupId>org.apache.hbase</groupId>
-  <artifactId>hbase</artifactId>
-  <packaging>pom</packaging>
+  <artifactId>core</artifactId>
+  <packaging>jar</packaging>
   <version>0.91.0-security-SNAPSHOT</version>
-  <name>HBase</name>
-  <description>
-    HBase is the &amp;lt;a href="http://hadoop.apache.org"&amp;rt;Hadoop&lt;/a&amp;rt; database. Use it when you need
-    random, realtime read/write access to your Big Data.
-    This project's goal is the hosting of very large tables -- billions of rows X millions of columns -- atop clusters
-    of commodity hardware.
-  </description>
-  <url>http://hbase.apache.org</url>
-  <modules>
-    <module>core</module>
-    <module>security</module>
-  </modules>
-
-  <scm>
-    <connection>scm:svn:http://svn.apache.org/repos/asf/hbase/trunk</connection>
-    <developerConnection>scm:svn:https://svn.apache.org/repos/asf/hbase/trunk</developerConnection>
-    <url>http://svn.apache.org/viewvc/hbase/trunk</url>
-  </scm>
-
-  <issueManagement>
-    <system>JIRA</system>
-    <url>http://issues.apache.org/jira/browse/HBASE</url>
-  </issueManagement>
-
-  <ciManagement>
-    <system>hudson</system>
-    <url>http://hudson.zones.apache.org/hudson/view/HBase/job/HBase-TRUNK/</url>
-  </ciManagement>
-
-  <mailingLists>
-    <mailingList>
-      <name>User List</name>
-      <subscribe>user-subscribe@hbase.apache.org</subscribe>
-      <unsubscribe>user-unsubscribe@hbase.apache.org</unsubscribe>
-      <post>user@hbase.apache.org</post>
-      <archive>http://mail-archives.apache.org/mod_mbox/hbase-user/</archive>
-      <otherArchives>
-        <otherArchive>http://dir.gmane.org/gmane.comp.java.hadoop.hbase.user</otherArchive>
-        <otherArchive>http://search-hadoop.com/?q=&amp;fc_project=HBase</otherArchive>
-      </otherArchives>
-    </mailingList>
-    <mailingList>
-      <name>Developer List</name>
-      <subscribe>dev-subscribe@hbase.apache.org</subscribe>
-      <unsubscribe>dev-unsubscribe@hbase.apache.org</unsubscribe>
-      <post>dev@hbase.apache.org</post>
-      <archive>http://mail-archives.apache.org/mod_mbox/hbase-dev/</archive>
-      <otherArchives>
-        <otherArchive>http://dir.gmane.org/gmane.comp.java.hadoop.hbase.devel</otherArchive>
-        <otherArchive>http://search-hadoop.com/?q=&amp;fc_project=HBase</otherArchive>
-      </otherArchives>
-    </mailingList>
-    <mailingList>
-      <name>Commits List</name>
-      <subscribe>commits-subscribe@hbase.apache.org</subscribe>
-      <unsubscribe>commits-unsubscribe@hbase.apache.org</unsubscribe>
-      <archive>http://mail-archives.apache.org/mod_mbox/hbase-commits/</archive>
-    </mailingList>
-    <mailingList>
-      <name>Issues List</name>
-      <subscribe>issues-subscribe@hbase.apache.org</subscribe>
-      <unsubscribe>issues-unsubscribe@hbase.apache.org</unsubscribe>
-      <archive>http://mail-archives.apache.org/mod_mbox/hbase-issues/</archive>
-    </mailingList>
-  </mailingLists>
-
-  <developers>
-    <developer>
-      <id>apurtell</id>
-      <name>Andrew Purtell</name>
-      <email>apurtell@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>Trend Micro</organization>
-      <organizationUrl>http://www.trendmicro.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>garyh</id>
-      <name>Gary Helmling</name>
-      <email>garyh@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>Trend Micro</organization>
-      <organizationUrl>http://www.trendmicro.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>jdcryans</id>
-      <name>Jean-Daniel Cryans</name>
-      <email>jdcryans@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>StumbleUpon</organization>
-      <organizationUrl>http://www.stumbleupon.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>jgray</id>
-      <name>Jonathan Gray</name>
-      <email>jgray@streamy.com</email>
-      <timezone>-8</timezone>
-      <organization>Facebook</organization>
-      <organizationUrl>http://www.facebook.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>larsgeorge</id>
-      <name>Lars George</name>
-      <email>larsgeorge@apache.org</email>
-      <timezone>+1</timezone>
-      <organization>Cloudera</organization>
-      <organizationUrl>http://www.cloudera.com/</organizationUrl>
-    </developer>
-    <developer>
-      <id>nspiegelberg</id>
-      <name>Nicolas Spiegelberg</name>
-      <email>nspiegelberg@fb.com</email>
-      <timezone>-8</timezone>
-      <organization>Facebook</organization>
-      <organizationUrl>http://www.facebook.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>rawson</id>
-      <name>Ryan Rawson</name>
-      <email>rawson@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>StumbleUpon</organization>
-      <organizationUrl>http://www.stumbleupon.com</organizationUrl>
-    </developer>
-    <developer>
-      <id>stack</id>
-      <name>Michael Stack</name>
-      <email>stack@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>StumbleUpon</organization>
-      <organizationUrl>http://www.stumbleupon.com/</organizationUrl>
-    </developer>
-    <developer>
-      <id>todd</id>
-      <name>Todd Lipcon</name>
-      <email>todd@apache.org</email>
-      <timezone>-8</timezone>
-      <organization>Cloudera</organization>
-      <organizationUrl>http://www.cloudera.com</organizationUrl>
-    </developer>
-  </developers>
-
-  <repositories>
-    <repository>
-      <id>temp-thrift</id>
-      <name>Thrift 0.2.0</name>
-      <url>http://people.apache.org/~rawson/repo/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    <repository>
-      <id>java.net</id>
-      <name>Java.Net</name>
-      <url>http://download.java.net/maven/2/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    <repository>
-      <id>codehaus</id>
-      <name>Codehaus Public</name>
-      <url>http://repository.codehaus.org/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    <!-- snapshot builds of Hadoop 0.20.104-append branch for testing -->
-    <!--
-    <repository>
-      <id>ghelmling.testing</id>
-      <name>Gary Helmling test repo</name>
-      <url>http://boa04.iridiant.net:8000/~ghelmling/mvn/</url>
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-    </repository>
-    -->
-    <repository>
-      <id>repository.jboss.org</id>
-      <url>http://repository.jboss.org/nexus/content/groups/public-jboss/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </repository>
-  </repositories>
+  <name>HBase Core</name>
 
   <build>
     <!-- Some plugins (javadoc for example) can be used in the normal build- and the site phase.
@@ -348,6 +152,7 @@
           </dependency>
         </dependencies>
       </plugin>
+      <!--
       <plugin>
         <artifactId>maven-assembly-plugin</artifactId>
         <configuration>
@@ -358,7 +163,7 @@
           </descriptors>
         </configuration>
       </plugin>
-
+      -->
       <!-- Run with -Dmaven.test.skip.exec=true to build -tests.jar without running tests (this is needed for upstream projects whose tests need this jar simply for compilation)-->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -412,6 +217,68 @@
             <exclude>**/*$*</exclude>
           </excludes>
         </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>generate</id>
+            <phase>generate-sources</phase>
+            <configuration>
+              <tasks>
+                <property name="build.webapps"
+                          location="${project.build.directory}/hbase-webapps"/>
+                <property name="src.webapps"
+                          location="${basedir}/src/main/resources/hbase-webapps"/>
+                <property name="generated.sources"
+                          location="${project.build.directory}/generated-sources"/>
+
+                <mkdir dir="${build.webapps}"/>
+                <copy todir="${build.webapps}">
+                  <fileset dir="${src.webapps}">
+                    <exclude name="**/*.jsp"/>
+                    <exclude name="**/.*"/>
+                    <exclude name="**/*~"/>
+                  </fileset>
+                </copy>
+
+                <!--The compile.classpath is passed in by maven-->
+                <taskdef classname="org.apache.jasper.JspC" name="jspcompiler" classpathref="maven.compile.classpath"/>
+
+                <mkdir dir="${build.webapps}/master/WEB-INF"/>
+                <jspcompiler uriroot="${src.webapps}/master"
+                             outputdir="${generated.sources}"
+                             package="org.apache.hadoop.hbase.generated.master"
+                             webxml="${build.webapps}/master/WEB-INF/web.xml"/>
+
+                <mkdir dir="${build.webapps}/regionserver/WEB-INF"/>
+                <jspcompiler uriroot="${src.webapps}/regionserver"
+                             outputdir="${generated.sources}"
+                             package="org.apache.hadoop.hbase.generated.regionserver"
+                             webxml="${build.webapps}/regionserver/WEB-INF/web.xml"/>
+
+                <exec executable="sh">
+                  <arg line="${basedir}/src/saveVersion.sh ${project.version} ${generated.sources}"/>
+                </exec>
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+          <execution>
+            <phase>process-resources</phase>
+            <configuration>
+              <tasks>
+                <replace file="${project.build.outputDirectory}/hbase-default.xml"
+                  token="@@@VERSION@@@" value="${project.version}" />
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
