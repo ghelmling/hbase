@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.apache.hbase</groupId>
+    <artifactId>hbase</artifactId>
+    <version>0.91.0-security-SNAPSHOT</version>
+  </parent>
+
+  <groupId>org.apache.hbase</groupId>
+  <artifactId>security</artifactId>
+  <packaging>jar</packaging>
+  <version>0.91.0-security-SNAPSHOT</version>
+  <name>HBase Security</name>
+
+  <build>
+    <!-- Some plugins (javadoc for example) can be used in the normal build- and the site phase.
+         These plugins inherit their options from the <reporting> section below. These settings
+         can be overwritten here. -->
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <configuration>
+            <source>${compileSource}</source>
+            <target>${compileSource}</target>
+            <showWarnings>true</showWarnings>
+            <showDeprecation>false</showDeprecation>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <configuration>
+            <forkedProcessTimeoutInSeconds>900</forkedProcessTimeoutInSeconds>
+            <argLine>-enableassertions -Xmx1400m</argLine>
+            <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          </configuration>
+        </plugin>
+        <plugin>
+          <artifactId>maven-clean-plugin</artifactId>
+          <configuration>
+            <filesets>
+              <fileset>
+                <!--dfs tests have build dir hardcoded. Clean it as part of
+               clean target-->
+                <directory>build</directory>
+              </fileset>
+            </filesets>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.rat</groupId>
+          <artifactId>apache-rat-plugin</artifactId>
+          <version>0.6</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <!-- Run with -Dmaven.test.skip.exec=true to build -tests.jar without running tests (this is needed for upstream projects whose tests need this jar simply for compilation)-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>test-jar</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>org/apache/hadoop/hbase/mapreduce/Driver</mainClass>
+            </manifest>
+          </archive>
+          <!-- Exclude these 2 packages, because their dependency _binary_ files include the sources, and Maven 2.2 appears to add them to the sources to compile, weird-->
+          <excludes>
+            <exclude>org/apache/jute/**</exclude>
+            <exclude>org/apache/zookeeper/**</exclude>
+            <exclude>**/*.jsp</exclude>
+            <exclude>hbase-site.xml</exclude>
+            <exclude>log4j.properties</exclude>
+            <exclude>mapred-queues.xml</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+  <properties>
+    <compileSource>1.6</compileSource>
+    <hadoop.version>0.20.104.3-append-SNAPSHOT</hadoop.version>    
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>core</artifactId>
+      <version>0.91.0-security-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>core</artifactId>
+      <version>0.91.0-security-SNAPSHOT</version>
+      <type>test-jar</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-core</artifactId>
+      <version>${hadoop.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>hsqldb</groupId>
+          <artifactId>hsqldb</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.sf.kosmosfs</groupId>
+          <artifactId>kfs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jdt</groupId>
+          <artifactId>core</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>net.java.dev.jets3t</groupId>
+          <artifactId>jets3t</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>oro</groupId>
+          <artifactId>oro</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+  </dependencies>
+</project>

@@ -34,8 +34,8 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
 import org.apache.hadoop.hbase.io.hfile.Compression;
 import org.apache.hadoop.hbase.regionserver.StoreFile;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.io.WritableComparable;
 
 /**
@@ -154,7 +154,7 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
   public HTableDescriptor() {
     super();
     try {
-      setOwner(UserGroupInformation.getCurrentUser());
+      setOwner(User.getCurrent());
     }
     catch (IOException e) {
       //..
@@ -714,8 +714,8 @@ public class HTableDescriptor implements WritableComparable<HTableDescriptor> {
             HConstants.REPLICATION_SCOPE_LOCAL)});
 
 
-  public void setOwner(UserGroupInformation owner) {
-    setOwnerString(owner.getShortUserName());
+  public void setOwner(User owner) {
+    setOwnerString(owner.getShortName());
   }
 
   // used by admin.rb:alter(table_name,*args) to update owner.

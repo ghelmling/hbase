@@ -326,7 +326,7 @@
     <commons-logging.version>1.1.1</commons-logging.version>
     <commons-math.version>2.1</commons-math.version>
     <guava.version>r06</guava.version>
-    <hadoop.version>0.20.104.3-append-SNAPSHOT</hadoop.version>
+    <hadoop.version>0.20-append-r1057313</hadoop.version>
     <jasper.version>5.5.23</jasper.version>
     <jaxb-api.version>2.1</jaxb-api.version>
     <jetty.version>6.1.26</jetty.version>

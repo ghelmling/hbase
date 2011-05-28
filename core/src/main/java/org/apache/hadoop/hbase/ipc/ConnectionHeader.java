@@ -25,7 +25,7 @@ import java.io.IOException;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
-import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.security.HBaseSaslRpcServer.AuthMethod;
 
 /**
@@ -34,20 +34,20 @@ import org.apache.hadoop.hbase.security.HBaseSaslRpcServer.AuthMethod;
  */
 class ConnectionHeader implements Writable {
   private String protocol;
-  private UserGroupInformation ugi = null;
+  private User ugi = null;
   private AuthMethod authMethod;
 
   public ConnectionHeader() {}
 
   /**
    * Create a new {@link ConnectionHeader} with the given <code>protocol</code>
-   * and {@link UserGroupInformation}.
+   * and {@link User}.
    * @param protocol protocol used for communication between the IPC client
    *                 and the server
-   * @param ugi {@link UserGroupInformation} of the client communicating with
+   * @param ugi {@link User} of the client communicating with
    *            the server
    */
-  public ConnectionHeader(String protocol, UserGroupInformation ugi, AuthMethod authMethod) {
+  public ConnectionHeader(String protocol, User ugi, AuthMethod authMethod) {
     this.protocol = protocol;
     this.ugi = ugi;
     this.authMethod = authMethod;
@@ -66,8 +66,8 @@ class ConnectionHeader implements Writable {
       boolean realUserNamePresent = in.readBoolean();
       if (realUserNamePresent) {
         String realUserName = in.readUTF();
-        UserGroupInformation realUserUgi =
-            UserGroupInformation.createRemoteUser(realUserName);
+        User realUserUgi =
+            User.createRemoteUser(realUserName);
         ugi = UserGroupInformation.createProxyUser(username, realUserUgi);
       } else {
         ugi = UserGroupInformation.createRemoteUser(username);

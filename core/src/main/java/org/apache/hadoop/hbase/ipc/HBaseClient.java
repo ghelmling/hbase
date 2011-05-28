@@ -23,7 +23,7 @@ package org.apache.hadoop.hbase.ipc;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.security.HBaseSaslRpcServer;
+import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.IOUtils;
@@ -32,7 +32,6 @@ import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.ipc.RemoteException;
 import org.apache.hadoop.ipc.VersionedProtocol;
 import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import javax.net.SocketFactory;
@@ -219,7 +218,7 @@ public class HBaseClient {
                                        remoteId.getAddress().getHostName());
       }
       this.remoteId = remoteId;
-      UserGroupInformation ticket = remoteId.getTicket();
+      User ticket = remoteId.getTicket();
       Class<? extends VersionedProtocol> protocol = remoteId.getProtocol();
 
       header = new ConnectionHeader(
@@ -228,7 +227,7 @@ public class HBaseClient {
 
       this.setName("IPC Client (" + socketFactory.hashCode() +") connection to " +
         remoteId.getAddress().toString() +
-        ((ticket==null)?" from an unknown user": (" from " + ticket.getUserName())));
+        ((ticket==null)?" from an unknown user": (" from " + ticket.getName())));
       this.setDaemon(true);
     }
 
@@ -748,7 +747,7 @@ public class HBaseClient {
   }
 
   public Writable call(Writable param, InetSocketAddress addr,
-                       UserGroupInformation ticket, int rpcTimeout)
+                       User ticket, int rpcTimeout)
                        throws IOException, InterruptedException {
     return call(param, addr, null, ticket, rpcTimeout);
   }
@@ -760,7 +759,7 @@ public class HBaseClient {
    * threw an exception. */
   public Writable call(Writable param, InetSocketAddress addr,
                        Class<? extends VersionedProtocol> protocol,
-                       UserGroupInformation ticket, int rpcTimeout)
+                       User ticket, int rpcTimeout)
       throws InterruptedException, IOException {
     Call call = new Call(param);
     Connection connection = getConnection(addr, protocol, ticket, rpcTimeout, call);
@@ -834,7 +833,7 @@ public class HBaseClient {
    * @param addresses socket addresses
    * @return  Writable[]
    * @throws IOException e
-   * @deprecated Use {@link #call(Writable[], InetSocketAddress[], Class, UserGroupInformation)} instead
+   * @deprecated Use {@link #call(Writable[], InetSocketAddress[], Class, User)} instead
    */
   @Deprecated
   public Writable[] call(Writable[] params, InetSocketAddress[] addresses)
@@ -848,7 +847,7 @@ public class HBaseClient {
    * contains nulls for calls that timed out or errored.  */
   public Writable[] call(Writable[] params, InetSocketAddress[] addresses,
                          Class<? extends VersionedProtocol> protocol,
-                         UserGroupInformation ticket)
+                         User ticket)
       throws IOException, InterruptedException {
     if (addresses.length == 0) return new Writable[0];
 
@@ -883,7 +882,7 @@ public class HBaseClient {
    * pool.  Connections to a given host/port are reused. */
   private Connection getConnection(InetSocketAddress addr,
                                    Class<? extends VersionedProtocol> protocol,
-                                   UserGroupInformation ticket,
+                                   User ticket,
                                    int rpcTimeout,
                                    Call call)
                                    throws IOException {
@@ -921,14 +920,14 @@ public class HBaseClient {
    */
   protected static class ConnectionId {
     final InetSocketAddress address;
-    final UserGroupInformation ticket;
+    final User ticket;
     final int rpcTimeout;
     Class<? extends VersionedProtocol> protocol;
     private static final int PRIME = 16777619;
 
     ConnectionId(InetSocketAddress address,
         Class<? extends VersionedProtocol> protocol,
-        UserGroupInformation ticket,
+        User ticket,
         int rpcTimeout) {
       this.protocol = protocol;
       this.address = address;
@@ -944,7 +943,7 @@ public class HBaseClient {
       return protocol;
     }
 
-    UserGroupInformation getTicket() {
+    User getTicket() {
       return ticket;
     }
 

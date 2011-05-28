@@ -76,7 +76,6 @@ import org.apache.hadoop.hbase.master.handler.TableModifyFamilyHandler;
 import org.apache.hadoop.hbase.master.metrics.MasterMetrics;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.replication.regionserver.Replication;
-import org.apache.hadoop.hbase.security.HBasePolicyProvider;
 import org.apache.hadoop.hbase.security.User;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.InfoServer;
@@ -814,9 +813,9 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
     if (!isMasterRunning()) {
       throw new MasterNotRunningException();
     }
-    UserGroupInformation owner = RequestContext.getRequestUser();
+    User owner = RequestContext.getRequestUser();
     if (owner == null) {
-      owner = UserGroupInformation.getCurrentUser();
+      owner = User.getCurrent();
     }
     if (desc.getOwnerString() == null || desc.getOwnerString().equals("")) {
       desc.setOwner(owner);
