@@ -435,6 +435,9 @@ Release 0.92.0 - Unreleased
    HBASE-4793  HBase shell still using deprecated methods removed in HBASE-4436
    HBASE-4801  alter_status shell prints sensible message at completion
    HBASE-4796  Race between SplitRegionHandlers for the same region kills the master
+   HBASE-4816  Regionserver wouldn't go down because split happened exactly at same
+               time we issued bulk user region close call on our way out
+   HBASE-4815  Disable online altering by default, create a config for it
 
   TESTS
    HBASE-4450  test for number of blocks read: to serve as baseline for expected
@@ -798,7 +801,8 @@ Release 0.92.0 - Unreleased
    HBASE-4377  [hbck] Offline rebuild .META. from fs data only
                (Jonathan Hsieh)
    HBASE-4298  Support to drain RS nodes through ZK (Aravind Gottipati)
-   HBASE-2742  Provide strong authentication with a secure RPC engine         
+   HBASE-2742  Provide strong authentication with a secure RPC engine
+   HBASE-3025  Coprocessor based access control
 
 Release 0.90.5 - Unreleased
 
