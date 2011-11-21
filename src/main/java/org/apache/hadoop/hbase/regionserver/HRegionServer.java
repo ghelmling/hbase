@@ -350,6 +350,8 @@ public class HRegionServer implements HRegionInterface, HBaseRPCErrorHandler,
   throws IOException, InterruptedException {
     this.fsOk = true;
     this.conf = conf;
+    // Setup security configuration
+    User.initialize(conf);
     // Set how many times to retry talking to another server over HConnection.
     HConnectionManager.setServerSideHConnectionRetries(this.conf, LOG);
     this.isOnline = false;

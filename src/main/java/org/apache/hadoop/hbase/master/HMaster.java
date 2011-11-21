@@ -216,6 +216,8 @@ implements HMasterInterface, HMasterRegionInterface, MasterServices, Server {
   public HMaster(final Configuration conf)
   throws IOException, KeeperException, InterruptedException {
     this.conf = new Configuration(conf);
+    // Setup security configuration
+    User.initialize(conf);
     // Disable the block cache on the master
     this.conf.setFloat(CacheConfig.HFILE_BLOCK_CACHE_SIZE_KEY, 0.0f);
     // Set how many times to retry talking to another server over HConnection.

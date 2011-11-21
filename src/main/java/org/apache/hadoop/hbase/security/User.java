@@ -23,9 +23,8 @@ package org.apache.hadoop.hbase.security;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.avro.generated.HBase;
+import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
 import org.apache.hadoop.hbase.ipc.HBaseRPC;
-import org.apache.hadoop.hbase.regionserver.RegionCoprocessorHost;
 import org.apache.hadoop.hbase.util.Methods;
 import org.apache.hadoop.hbase.util.Strings;
 import org.apache.hadoop.mapred.JobConf;
@@ -37,6 +36,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -54,8 +54,12 @@ import org.apache.commons.logging.Log;
  * </p>
  */
 public abstract class User {
-  public static final String HBASE_SECURITY_CONF_KEY =
+  public static final String SECURITY_AUTHENTICATION_CONF_KEY =
       "hbase.security.authentication";
+  public static final String SECURITY_AUTHORIZATION_CONF_KEY =
+      "hbase.security.authorization";
+  // flags that a given Configuration object has already been initialized
+  private static final String INITIALIZED_CONF_KEY = "__initialized";
 
   /**
    * Flag to differentiate between API-incompatible changes to
@@ -71,9 +75,6 @@ public abstract class User {
     }
   }
   private static Log LOG = LogFactory.getLog(User.class);
-
-  private static boolean isSecureHBase;
-  private static boolean isInitialized;
 
   protected UserGroupInformation ugi;
 
@@ -231,26 +232,54 @@ public abstract class User {
    * <code>kerberos</code>.
    */
   public static boolean isHBaseSecurityEnabled(Configuration conf) {
-    initialize(conf);
-    return "kerberos".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
+    return "kerberos".equalsIgnoreCase(
+        conf.get(SECURITY_AUTHENTICATION_CONF_KEY));
+  }
+
+  public static boolean isHBaseAuthorizationEnabled(Configuration conf) {
+    return conf.getBoolean(SECURITY_AUTHORIZATION_CONF_KEY, false);
   }
 
   public synchronized static void initialize(Configuration conf) {
-    if (!isInitialized) {
-      isInitialized = true;
-      isSecureHBase = "kerberos".equalsIgnoreCase(conf.get(HBASE_SECURITY_CONF_KEY));
-      if (isSecureHBase) {
-        // setup additional security configuration
-        conf.set(HBaseRPC.RPC_ENGINE_PROP, "org.apache.hadoop.hbase.ipc.SecureRpcEngine");
+    if (conf.getRaw(INITIALIZED_CONF_KEY) == null) {
+      conf.setBoolean(INITIALIZED_CONF_KEY, true);
+      boolean isSecureAuthentication = isHBaseSecurityEnabled(conf);
+      LOG.debug("HBase security " + (isSecureAuthentication ? "enabled" : "disabled"));
+      boolean isAuthorizationEnabled = isHBaseAuthorizationEnabled(conf);
+      LOG.debug("HBase authorization " + (isAuthorizationEnabled ? "enabled" : "disabled"));
 
+      if (isSecureAuthentication || isAuthorizationEnabled) {
         // add TokenProvider coprocessor for authentication token support
-        String regionCPs = conf.get(RegionCoprocessorHost.REGION_COPROCESSOR_CONF_KEY, "");
-        List<String> updatedCPs = Arrays.asList(regionCPs.split("\\s*,\\s*"));
-        if (!updatedCPs.contains("org.apache.hadoop.hbase.security.token.TokenProvider")) {
-          updatedCPs.add("org.apache.hadoop.hbase.security.token.TokenProvider");
+        String regionCPs = conf.get(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY, "");
+        List<String> cpClasses =
+            new ArrayList<String>(Arrays.asList(regionCPs.split("\\s*,\\s*")));
+        if (isSecureAuthentication) {
+          // require secure RPC engine
+          conf.set(HBaseRPC.RPC_ENGINE_PROP, "org.apache.hadoop.hbase.ipc.SecureRpcEngine");
+          // endpoint to provide auth tokens for map reduce jobs
+          if (!cpClasses.contains("org.apache.hadoop.hbase.security.token.TokenProvider")) {
+            cpClasses.add(0, "org.apache.hadoop.hbase.security.token.TokenProvider");
+          }
         }
-        conf.set(RegionCoprocessorHost.REGION_COPROCESSOR_CONF_KEY,
-            Strings.join(updatedCPs, ","));
+        if (isAuthorizationEnabled) {
+          // add AccessController for region authorization checks
+          if (!cpClasses.contains("org.apache.hadoop.hbase.security.access.AccessController")) {
+            cpClasses.add(0, "org.apache.hadoop.hbase.security.access.AccessController");
+          }
+
+          // add AccessController for master authorization checks
+          String masterCPs = conf.get(CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY, "");
+          List<String> masterClasses =
+              new ArrayList<String>(Arrays.asList(masterCPs.split("\\s,\\s")));
+          if (!masterClasses.contains("org.apache.hadoop.hbase.security.access.AccessController")) {
+            masterClasses.add(0, "org.apache.hadoop.hbase.security.access.AccessController");
+            conf.set(CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY,
+                Strings.join(masterClasses, ","));
+          }
+        }
+
+        conf.set(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY,
+            Strings.join(cpClasses, ","));
       }
     }
   }

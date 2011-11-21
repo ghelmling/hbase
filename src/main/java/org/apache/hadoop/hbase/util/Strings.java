@@ -59,9 +59,18 @@ public class Strings {
     return sb.append(key).append(separator).append(value);
   }
 
+  /**
+   * Joins a collection of {@code String}s into a single new {@code String},
+   * with each value separated by the given delimiter.
+   * @param values the source values to join
+   * @param delimiter the sequence used to separate each source value
+   * @return A new <code>String</code> of concatenated source values separated
+   *     by the delimiter
+   */
   public static String join(Iterable<String> values, String delimiter) {
     StringBuilder buf = new StringBuilder();
     for (String v : values) {
+      if (v == null || v.isEmpty()) continue;
       if (buf.length() > 0) buf.append(delimiter);
       buf.append(v);
     }

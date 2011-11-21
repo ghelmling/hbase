@@ -215,6 +215,7 @@ public class TableMapReduceUtil {
   }
 
   public static void initCredentials(Job job) throws IOException {
+    User.initialize(job.getConfiguration());
     if (User.isHBaseSecurityEnabled(job.getConfiguration())) {
       try {
         User.getCurrent().obtainAuthTokenForJob(job.getConfiguration(), job);

@@ -26,11 +26,12 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.SmallTests;
+import org.apache.hadoop.hbase.coprocessor.CoprocessorHost;
+import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 import java.io.IOException;
-import java.security.PrivilegedAction;
 import java.security.PrivilegedExceptionAction;
 
 @Category(SmallTests.class)
@@ -103,5 +104,52 @@ public class TestUser {
       assertNotNull(u);
       assertEquals(user1.getName(), u.getName());
     }
+  }
+
+  /**
+   * Test security configuration setup
+   */
+  @Test
+  public void testInitialize() throws Exception {
+    // test basic settings for authentication
+    Configuration conf = new Configuration();
+    conf.set(User.SECURITY_AUTHENTICATION_CONF_KEY, "kerberos");
+    User.initialize(conf);
+    assertTrue(User.isHBaseSecurityEnabled(conf));
+    assertEquals("kerberos", conf.get(User.SECURITY_AUTHENTICATION_CONF_KEY));
+    assertEquals("org.apache.hadoop.hbase.ipc.SecureRpcEngine",
+        conf.get(HBaseRPC.RPC_ENGINE_PROP));
+    assertEquals("org.apache.hadoop.hbase.security.token.TokenProvider",
+        conf.get(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY));
+
+    // test basic settings for authorization
+    conf = new Configuration();
+    conf.setBoolean(User.SECURITY_AUTHORIZATION_CONF_KEY, true);
+    User.initialize(conf);
+    assertTrue(User.isHBaseAuthorizationEnabled(conf));
+    assertTrue(conf.getBoolean(User.SECURITY_AUTHORIZATION_CONF_KEY, false));
+    assertEquals("org.apache.hadoop.hbase.security.access.AccessController",
+        conf.get(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY));
+    assertEquals("org.apache.hadoop.hbase.security.access.AccessController",
+        conf.get(CoprocessorHost.MASTER_COPROCESSOR_CONF_KEY));
+
+    // verify that coprocessors are correctly added to existing coprocessor config
+    conf = new Configuration();
+    conf.set(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY, "com.example.CP1,com.example.CP2");
+    conf.set(User.SECURITY_AUTHENTICATION_CONF_KEY, "kerberos");
+    conf.setBoolean(User.SECURITY_AUTHORIZATION_CONF_KEY, true);
+    User.initialize(conf);
+    String[] regionCPs =
+        conf.get(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY, "")
+            .split(",");
+    assertNotNull(regionCPs);
+    assertEquals(4, regionCPs.length);
+    // AccessController should be ordered first, followed by TokenProvider
+    assertEquals("org.apache.hadoop.hbase.security.access.AccessController",
+        regionCPs[0]);
+    assertEquals("org.apache.hadoop.hbase.security.token.TokenProvider",
+        regionCPs[1]);
+    assertEquals("com.example.CP1", regionCPs[2]);
+    assertEquals("com.example.CP2", regionCPs[3]);
   }
 }

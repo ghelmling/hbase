@@ -513,6 +513,7 @@ public class HConnectionManager {
     @SuppressWarnings("unchecked")
     public HConnectionImplementation(Configuration conf)
     throws ZooKeeperConnectionException {
+      User.initialize(conf);
       this.conf = conf;
       String serverClassName = conf.get(HConstants.REGION_SERVER_CLASS,
         HConstants.DEFAULT_REGION_SERVER_CLASS);
