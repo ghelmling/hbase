@@ -37,7 +37,7 @@ public class Strings {
   public static StringBuilder appendKeyValue(final StringBuilder sb,
       final String key, final Object value) {
     return appendKeyValue(sb, key, value, DEFAULT_SEPARATOR,
-      DEFAULT_KEYVALUE_SEPARATOR);
+        DEFAULT_KEYVALUE_SEPARATOR);
   }
 
   /**
@@ -57,5 +57,14 @@ public class Strings {
       sb.append(keyValueSeparator);
     }
     return sb.append(key).append(separator).append(value);
+  }
+
+  public static String join(Iterable<String> values, String delimiter) {
+    StringBuilder buf = new StringBuilder();
+    for (String v : values) {
+      if (buf.length() > 0) buf.append(delimiter);
+      buf.append(v);
+    }
+    return buf.toString();
   }
 }
