@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.*;
 import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.regionserver.Store.ScanInfo;
 import org.apache.hadoop.hbase.regionserver.StoreScanner.ScanType;
+import org.apache.hadoop.hbase.regionserver.metrics.SchemaMetrics;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.junit.experimental.categories.Category;
 
@@ -43,6 +44,11 @@ public class TestStoreScanner extends TestCase {
   private ScanInfo scanInfo = new ScanInfo(CF, 0, Integer.MAX_VALUE, Long.MAX_VALUE, false,
       KeyValue.COMPARATOR);
   private ScanType scanType = ScanType.USER_SCAN;
+
+  public void setUp() throws Exception {
+    super.setUp();
+    SchemaMetrics.setUseTableNameInTest(false);
+  }
 
   /*
    * Test utility for building a NavigableSet for scanners.
@@ -459,5 +465,34 @@ public class TestStoreScanner extends TestCase {
     StoreScanner scan = new StoreScanner(scanSpec, scanInfo, scanType,
         getCols("a"), scanners);
     assertNull(scan.peek());
+  }
+
+  /**
+   * Ensure that expired delete family markers don't override valid puts
+   */
+  public void testExpiredDeleteFamily() throws Exception {
+    long now = System.currentTimeMillis();
+    KeyValue [] kvs = new KeyValue[] {
+        new KeyValue(Bytes.toBytes("R1"), Bytes.toBytes("cf"), null, now-1000,
+            KeyValue.Type.DeleteFamily),
+        KeyValueTestUtil.create("R1", "cf", "a", now-10, KeyValue.Type.Put,
+            "dont-care"),
+    };
+    List<KeyValueScanner> scanners = scanFixture(kvs);
+    Scan scan = new Scan();
+    scan.setMaxVersions(1);
+    // scanner with ttl equal to 500
+    ScanInfo scanInfo = new ScanInfo(CF, 0, 1, 500, false, KeyValue.COMPARATOR);
+    ScanType scanType = ScanType.USER_SCAN;
+    StoreScanner scanner =
+        new StoreScanner(scan, scanInfo, scanType, null, scanners);
+
+    List<KeyValue> results = new ArrayList<KeyValue>();
+    assertEquals(true, scanner.next(results));
+    assertEquals(1, results.size());
+    assertEquals(kvs[1], results.get(0));
+    results.clear();
+
+    assertEquals(false, scanner.next(results));
   }
 }
