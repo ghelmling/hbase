@@ -71,64 +71,66 @@ public class TestMasterFailover {
 
     // Start the cluster
     HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility();
-    TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
-    MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+    try {
+      TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
+      MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
 
-    // get all the master threads
-    List<MasterThread> masterThreads = cluster.getMasterThreads();
+      // get all the master threads
+      List<MasterThread> masterThreads = cluster.getMasterThreads();
 
-    // wait for each to come online
-    for (MasterThread mt : masterThreads) {
-      assertTrue(mt.isAlive());
-    }
-
-    // verify only one is the active master and we have right number
-    int numActive = 0;
-    int activeIndex = -1;
-    ServerName activeName = null;
-    for (int i = 0; i < masterThreads.size(); i++) {
-      if (masterThreads.get(i).getMaster().isActiveMaster()) {
-        numActive++;
-        activeIndex = i;
-        activeName = masterThreads.get(i).getMaster().getServerName();
+      // wait for each to come online
+      for (MasterThread mt : masterThreads) {
+        assertTrue(mt.isAlive());
       }
-    }
-    assertEquals(1, numActive);
-    assertEquals(NUM_MASTERS, masterThreads.size());
 
-    // attempt to stop one of the inactive masters
-    LOG.debug("\n\nStopping a backup master\n");
-    int backupIndex = (activeIndex == 0 ? 1 : activeIndex - 1);
-    cluster.stopMaster(backupIndex, false);
-    cluster.waitOnMaster(backupIndex);
-
-    // verify still one active master and it's the same
-    for (int i = 0; i < masterThreads.size(); i++) {
-      if (masterThreads.get(i).getMaster().isActiveMaster()) {
-        assertTrue(activeName.equals(
-            masterThreads.get(i).getMaster().getServerName()));
-        activeIndex = i;
+      // verify only one is the active master and we have right number
+      int numActive = 0;
+      int activeIndex = -1;
+      ServerName activeName = null;
+      for (int i = 0; i < masterThreads.size(); i++) {
+        if (masterThreads.get(i).getMaster().isActiveMaster()) {
+          numActive++;
+          activeIndex = i;
+          activeName = masterThreads.get(i).getMaster().getServerName();
+        }
       }
+      assertEquals(1, numActive);
+      assertEquals(NUM_MASTERS, masterThreads.size());
+
+      // attempt to stop one of the inactive masters
+      LOG.debug("\n\nStopping a backup master\n");
+      int backupIndex = (activeIndex == 0 ? 1 : activeIndex - 1);
+      cluster.stopMaster(backupIndex, false);
+      cluster.waitOnMaster(backupIndex);
+
+      // verify still one active master and it's the same
+      for (int i = 0; i < masterThreads.size(); i++) {
+        if (masterThreads.get(i).getMaster().isActiveMaster()) {
+          assertTrue(activeName.equals(
+              masterThreads.get(i).getMaster().getServerName()));
+          activeIndex = i;
+        }
+      }
+      assertEquals(1, numActive);
+      assertEquals(2, masterThreads.size());
+
+      // kill the active master
+      LOG.debug("\n\nStopping the active master\n");
+      cluster.stopMaster(activeIndex, false);
+      cluster.waitOnMaster(activeIndex);
+
+      // wait for an active master to show up and be ready
+      assertTrue(cluster.waitForActiveAndReadyMaster());
+
+      LOG.debug("\n\nVerifying backup master is now active\n");
+      // should only have one master now
+      assertEquals(1, masterThreads.size());
+      // and he should be active
+      assertTrue(masterThreads.get(0).getMaster().isActiveMaster());
+    } finally {
+      // Stop the cluster
+      TEST_UTIL.shutdownMiniCluster();
     }
-    assertEquals(1, numActive);
-    assertEquals(2, masterThreads.size());
-
-    // kill the active master
-    LOG.debug("\n\nStopping the active master\n");
-    cluster.stopMaster(activeIndex, false);
-    cluster.waitOnMaster(activeIndex);
-
-    // wait for an active master to show up and be ready
-    assertTrue(cluster.waitForActiveAndReadyMaster());
-
-    LOG.debug("\n\nVerifying backup master is now active\n");
-    // should only have one master now
-    assertEquals(1, masterThreads.size());
-    // and he should be active
-    assertTrue(masterThreads.get(0).getMaster().isActiveMaster());
-
-    // Stop the cluster
-    TEST_UTIL.shutdownMiniCluster();
   }
 
   @Test
@@ -142,69 +144,70 @@ public class TestMasterFailover {
     conf.setInt("hbase.master.assignment.timeoutmonitor.timeout", 8000);
     // Start the cluster
     HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility(conf);
-    TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
-    MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+    try {
+      TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
+      MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+      // get all the master threads
+      List<MasterThread> masterThreads = cluster.getMasterThreads();
 
-    // get all the master threads
-    List<MasterThread> masterThreads = cluster.getMasterThreads();
-
-    // wait for each to come online
-    for (MasterThread mt : masterThreads) {
-      assertTrue(mt.isAlive());
-    }
-
-    // verify only one is the active master and we have right number
-    int numActive = 0;
-    ServerName activeName = null;
-    for (int i = 0; i < masterThreads.size(); i++) {
-      if (masterThreads.get(i).getMaster().isActiveMaster()) {
-        numActive++;
-        activeName = masterThreads.get(i).getMaster().getServerName();
+      // wait for each to come online
+      for (MasterThread mt : masterThreads) {
+        assertTrue(mt.isAlive());
       }
-    }
-    assertEquals(1, numActive);
-    assertEquals(NUM_MASTERS, masterThreads.size());
 
-    // verify still one active master and it's the same
-    for (int i = 0; i < masterThreads.size(); i++) {
-      if (masterThreads.get(i).getMaster().isActiveMaster()) {
-        assertTrue(activeName.equals(masterThreads.get(i).getMaster()
-            .getServerName()));
+      // verify only one is the active master and we have right number
+      int numActive = 0;
+      ServerName activeName = null;
+      for (int i = 0; i < masterThreads.size(); i++) {
+        if (masterThreads.get(i).getMaster().isActiveMaster()) {
+          numActive++;
+          activeName = masterThreads.get(i).getMaster().getServerName();
+        }
       }
-    }
-    assertEquals(1, numActive);
-    assertEquals(1, masterThreads.size());
+      assertEquals(1, numActive);
+      assertEquals(NUM_MASTERS, masterThreads.size());
 
-    List<RegionServerThread> regionServerThreads = cluster
-        .getRegionServerThreads();
-    int count = -1;
-    HRegion metaRegion = null;
-    for (RegionServerThread regionServerThread : regionServerThreads) {
-      HRegionServer regionServer = regionServerThread.getRegionServer();
-      metaRegion = regionServer
-          .getOnlineRegion(HRegionInfo.FIRST_META_REGIONINFO.getRegionName());
-      count++;
-      regionServer.abort("");
-      if (null != metaRegion) {
-        break;
+      // verify still one active master and it's the same
+      for (int i = 0; i < masterThreads.size(); i++) {
+        if (masterThreads.get(i).getMaster().isActiveMaster()) {
+          assertTrue(activeName.equals(masterThreads.get(i).getMaster()
+              .getServerName()));
+        }
       }
+      assertEquals(1, numActive);
+      assertEquals(1, masterThreads.size());
+
+      List<RegionServerThread> regionServerThreads = cluster
+          .getRegionServerThreads();
+      int count = -1;
+      HRegion metaRegion = null;
+      for (RegionServerThread regionServerThread : regionServerThreads) {
+        HRegionServer regionServer = regionServerThread.getRegionServer();
+        metaRegion = regionServer
+            .getOnlineRegion(HRegionInfo.FIRST_META_REGIONINFO.getRegionName());
+        count++;
+        regionServer.abort("");
+        if (null != metaRegion) {
+          break;
+        }
+      }
+      HRegionServer regionServer = cluster.getRegionServer(count);
+
+      cluster.shutdown();
+      // Create a ZKW to use in the test
+      ZooKeeperWatcher zkw =
+        HBaseTestingUtility.createAndForceNodeToOpenedState(TEST_UTIL,
+            metaRegion, regionServer.getServerName());
+
+      TEST_UTIL.startMiniHBaseCluster(1, 1);
+
+      // Failover should be completed, now wait for no RIT
+      log("Waiting for no more RIT");
+      ZKAssign.blockUntilNoRIT(zkw);
+    } finally {
+      // Stop the cluster
+      TEST_UTIL.shutdownMiniCluster();
     }
-    HRegionServer regionServer = cluster.getRegionServer(count);
-
-    cluster.shutdown();
-    // Create a ZKW to use in the test
-    ZooKeeperWatcher zkw = 
-      HBaseTestingUtility.createAndForceNodeToOpenedState(TEST_UTIL, 
-          metaRegion, regionServer.getServerName());
-
-    TEST_UTIL.startMiniHBaseCluster(1, 1);
-
-    // Failover should be completed, now wait for no RIT
-    log("Waiting for no more RIT");
-    ZKAssign.blockUntilNoRIT(zkw);
-
-    // Stop the cluster
-    TEST_UTIL.shutdownMiniCluster();
   }
 
 
@@ -301,258 +304,259 @@ public class TestMasterFailover {
 
     // Start the cluster
     HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility(conf);
-    TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
-    MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
-    log("Cluster started");
+    try {
+      TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
+      MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+      log("Cluster started");
+      // Create a ZKW to use in the test
+      ZooKeeperWatcher zkw = new ZooKeeperWatcher(TEST_UTIL.getConfiguration(),
+        "unittest", new Abortable() {
+        boolean aborted = false;
+          @Override
+          public void abort(String why, Throwable e) {
+            this.aborted = true;
+            throw new RuntimeException("Fatal ZK error, why=" + why, e);
+          }
 
-    // Create a ZKW to use in the test
-    ZooKeeperWatcher zkw = new ZooKeeperWatcher(TEST_UTIL.getConfiguration(),
-      "unittest", new Abortable() {
-    	boolean aborted = false;
-        @Override
-        public void abort(String why, Throwable e) {
-          this.aborted = true;
-          throw new RuntimeException("Fatal ZK error, why=" + why, e);
-        }
-        
-        @Override
-        public boolean isAborted() {
-          return this.aborted;
-        }
-        
-    });
+          @Override
+          public boolean isAborted() {
+            return this.aborted;
+          }
 
-    // get all the master threads
-    List<MasterThread> masterThreads = cluster.getMasterThreads();
-    assertEquals(1, masterThreads.size());
+      });
 
-    // only one master thread, let's wait for it to be initialized
-    assertTrue(cluster.waitForActiveAndReadyMaster());
-    HMaster master = masterThreads.get(0).getMaster();
-    assertTrue(master.isActiveMaster());
-    assertTrue(master.isInitialized());
+      // get all the master threads
+      List<MasterThread> masterThreads = cluster.getMasterThreads();
+      assertEquals(1, masterThreads.size());
 
-    // disable load balancing on this master
-    master.balanceSwitch(false);
+      // only one master thread, let's wait for it to be initialized
+      assertTrue(cluster.waitForActiveAndReadyMaster());
+      HMaster master = masterThreads.get(0).getMaster();
+      assertTrue(master.isActiveMaster());
+      assertTrue(master.isInitialized());
 
-    // create two tables in META, each with 10 regions
-    byte [] FAMILY = Bytes.toBytes("family");
-    byte [][] SPLIT_KEYS = new byte [][] {
-        new byte[0], Bytes.toBytes("aaa"), Bytes.toBytes("bbb"),
-        Bytes.toBytes("ccc"), Bytes.toBytes("ddd"), Bytes.toBytes("eee"),
-        Bytes.toBytes("fff"), Bytes.toBytes("ggg"), Bytes.toBytes("hhh"),
-        Bytes.toBytes("iii"), Bytes.toBytes("jjj")
-    };
+      // disable load balancing on this master
+      master.balanceSwitch(false);
 
-    byte [] enabledTable = Bytes.toBytes("enabledTable");
-    HTableDescriptor htdEnabled = new HTableDescriptor(enabledTable);
-    htdEnabled.addFamily(new HColumnDescriptor(FAMILY));
+      // create two tables in META, each with 10 regions
+      byte [] FAMILY = Bytes.toBytes("family");
+      byte [][] SPLIT_KEYS = new byte [][] {
+          new byte[0], Bytes.toBytes("aaa"), Bytes.toBytes("bbb"),
+          Bytes.toBytes("ccc"), Bytes.toBytes("ddd"), Bytes.toBytes("eee"),
+          Bytes.toBytes("fff"), Bytes.toBytes("ggg"), Bytes.toBytes("hhh"),
+          Bytes.toBytes("iii"), Bytes.toBytes("jjj")
+      };
 
-    FileSystem filesystem = FileSystem.get(conf);
-    Path rootdir = filesystem.makeQualified(
-        new Path(conf.get(HConstants.HBASE_DIR)));
-    // Write the .tableinfo
-    FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdEnabled);
+      byte [] enabledTable = Bytes.toBytes("enabledTable");
+      HTableDescriptor htdEnabled = new HTableDescriptor(enabledTable);
+      htdEnabled.addFamily(new HColumnDescriptor(FAMILY));
 
-    HRegionInfo hriEnabled = new HRegionInfo(htdEnabled.getName(), null, null);
-    HRegion.createHRegion(hriEnabled, rootdir, conf, htdEnabled);
+      FileSystem filesystem = FileSystem.get(conf);
+      Path rootdir = filesystem.makeQualified(
+          new Path(conf.get(HConstants.HBASE_DIR)));
+      // Write the .tableinfo
+      FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdEnabled);
 
-    List<HRegionInfo> enabledRegions = TEST_UTIL.createMultiRegionsInMeta(
-        TEST_UTIL.getConfiguration(), htdEnabled, SPLIT_KEYS);
+      HRegionInfo hriEnabled = new HRegionInfo(htdEnabled.getName(), null, null);
+      HRegion.createHRegion(hriEnabled, rootdir, conf, htdEnabled);
 
-    byte [] disabledTable = Bytes.toBytes("disabledTable");
-    HTableDescriptor htdDisabled = new HTableDescriptor(disabledTable);
-    htdDisabled.addFamily(new HColumnDescriptor(FAMILY));
-    // Write the .tableinfo
-    FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdDisabled);
-    HRegionInfo hriDisabled = new HRegionInfo(htdDisabled.getName(), null, null);
-    HRegion.createHRegion(hriDisabled, rootdir, conf, htdDisabled);
-    List<HRegionInfo> disabledRegions = TEST_UTIL.createMultiRegionsInMeta(
-        TEST_UTIL.getConfiguration(), htdDisabled, SPLIT_KEYS);
+      List<HRegionInfo> enabledRegions = TEST_UTIL.createMultiRegionsInMeta(
+          TEST_UTIL.getConfiguration(), htdEnabled, SPLIT_KEYS);
 
-    log("Regions in META have been created");
+      byte [] disabledTable = Bytes.toBytes("disabledTable");
+      HTableDescriptor htdDisabled = new HTableDescriptor(disabledTable);
+      htdDisabled.addFamily(new HColumnDescriptor(FAMILY));
+      // Write the .tableinfo
+      FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdDisabled);
+      HRegionInfo hriDisabled = new HRegionInfo(htdDisabled.getName(), null, null);
+      HRegion.createHRegion(hriDisabled, rootdir, conf, htdDisabled);
+      List<HRegionInfo> disabledRegions = TEST_UTIL.createMultiRegionsInMeta(
+          TEST_UTIL.getConfiguration(), htdDisabled, SPLIT_KEYS);
 
-    // at this point we only expect 2 regions to be assigned out (catalogs)
-    assertEquals(2, cluster.countServedRegions());
+      log("Regions in META have been created");
 
-    // Let's just assign everything to first RS
-    HRegionServer hrs = cluster.getRegionServer(0);
-    ServerName serverName = hrs.getServerName();
+      // at this point we only expect 2 regions to be assigned out (catalogs)
+      assertEquals(2, cluster.countServedRegions());
 
-    // we'll need some regions to already be assigned out properly on live RS
-    List<HRegionInfo> enabledAndAssignedRegions = new ArrayList<HRegionInfo>();
-    enabledAndAssignedRegions.add(enabledRegions.remove(0));
-    enabledAndAssignedRegions.add(enabledRegions.remove(0));
-    List<HRegionInfo> disabledAndAssignedRegions = new ArrayList<HRegionInfo>();
-    disabledAndAssignedRegions.add(disabledRegions.remove(0));
-    disabledAndAssignedRegions.add(disabledRegions.remove(0));
+      // Let's just assign everything to first RS
+      HRegionServer hrs = cluster.getRegionServer(0);
+      ServerName serverName = hrs.getServerName();
 
-    // now actually assign them
-    for (HRegionInfo hri : enabledAndAssignedRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, serverName));
-      master.assignRegion(hri);
-    }
-    for (HRegionInfo hri : disabledAndAssignedRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, serverName));
-      master.assignRegion(hri);
-    }
+      // we'll need some regions to already be assigned out properly on live RS
+      List<HRegionInfo> enabledAndAssignedRegions = new ArrayList<HRegionInfo>();
+      enabledAndAssignedRegions.add(enabledRegions.remove(0));
+      enabledAndAssignedRegions.add(enabledRegions.remove(0));
+      List<HRegionInfo> disabledAndAssignedRegions = new ArrayList<HRegionInfo>();
+      disabledAndAssignedRegions.add(disabledRegions.remove(0));
+      disabledAndAssignedRegions.add(disabledRegions.remove(0));
 
-    // wait for no more RIT
-    log("Waiting for assignment to finish");
-    ZKAssign.blockUntilNoRIT(zkw);
-    log("Assignment completed");
-
-    // Stop the master
-    log("Aborting master");
-    cluster.abortMaster(0);
-    cluster.waitOnMaster(0);
-    log("Master has aborted");
-
-    /*
-     * Now, let's start mocking up some weird states as described in the method
-     * javadoc.
-     */
-
-    List<HRegionInfo> regionsThatShouldBeOnline = new ArrayList<HRegionInfo>();
-    List<HRegionInfo> regionsThatShouldBeOffline = new ArrayList<HRegionInfo>();
-
-    log("Beginning to mock scenarios");
-
-    // Disable the disabledTable in ZK
-    ZKTable zktable = new ZKTable(zkw);
-    zktable.setDisabledTable(Bytes.toString(disabledTable));
-
-    /*
-     *  ZK = OFFLINE
-     */
-
-    // Region that should be assigned but is not and is in ZK as OFFLINE
-    HRegionInfo region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, serverName);
-
-    /*
-     * ZK = CLOSING
-     */
-
-//    Disabled test of CLOSING.  This case is invalid after HBASE-3181.
-//    How can an RS stop a CLOSING w/o deleting the node?  If it did ever fail
-//    and left the node in CLOSING, the RS would have aborted and we'd process
-//    these regions in server shutdown
-//
-//    // Region of enabled table being closed but not complete
-//    // Region is already assigned, don't say anything to RS but set ZK closing
-//    region = enabledAndAssignedRegions.remove(0);
-//    regionsThatShouldBeOnline.add(region);
-//    ZKAssign.createNodeClosing(zkw, region, serverName);
-//
-//    // Region of disabled table being closed but not complete
-//    // Region is already assigned, don't say anything to RS but set ZK closing
-//    region = disabledAndAssignedRegions.remove(0);
-//    regionsThatShouldBeOffline.add(region);
-//    ZKAssign.createNodeClosing(zkw, region, serverName);
-
-    /*
-     * ZK = CLOSED
-     */
-
-    // Region of enabled table closed but not ack
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    int version = ZKAssign.createNodeClosing(zkw, region, serverName);
-    ZKAssign.transitionNodeClosed(zkw, region, serverName, version);
-
-    // Region of disabled table closed but not ack
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    version = ZKAssign.createNodeClosing(zkw, region, serverName);
-    ZKAssign.transitionNodeClosed(zkw, region, serverName, version);
-
-    /*
-     * ZK = OPENING
-     */
-
-    // RS was opening a region of enabled table but never finishes
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, serverName);
-    ZKAssign.transitionNodeOpening(zkw, region, serverName);
-
-    /*
-     * ZK = OPENED
-     */
-
-    // Region of enabled table was opened on RS
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, serverName);
-    hrs.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        break;
+      // now actually assign them
+      for (HRegionInfo hri : enabledAndAssignedRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, serverName));
+        master.assignRegion(hri);
       }
-      Thread.sleep(100);
-    }
-
-    // Region of disable table was opened on RS
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, serverName);
-    hrs.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        break;
+      for (HRegionInfo hri : disabledAndAssignedRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, serverName));
+        master.assignRegion(hri);
       }
-      Thread.sleep(100);
+
+      // wait for no more RIT
+      log("Waiting for assignment to finish");
+      ZKAssign.blockUntilNoRIT(zkw);
+      log("Assignment completed");
+
+      // Stop the master
+      log("Aborting master");
+      cluster.abortMaster(0);
+      cluster.waitOnMaster(0);
+      log("Master has aborted");
+
+      /*
+       * Now, let's start mocking up some weird states as described in the method
+       * javadoc.
+       */
+
+      List<HRegionInfo> regionsThatShouldBeOnline = new ArrayList<HRegionInfo>();
+      List<HRegionInfo> regionsThatShouldBeOffline = new ArrayList<HRegionInfo>();
+
+      log("Beginning to mock scenarios");
+
+      // Disable the disabledTable in ZK
+      ZKTable zktable = new ZKTable(zkw);
+      zktable.setDisabledTable(Bytes.toString(disabledTable));
+
+      /*
+       *  ZK = OFFLINE
+       */
+
+      // Region that should be assigned but is not and is in ZK as OFFLINE
+      HRegionInfo region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, serverName);
+
+      /*
+       * ZK = CLOSING
+       */
+
+  //    Disabled test of CLOSING.  This case is invalid after HBASE-3181.
+  //    How can an RS stop a CLOSING w/o deleting the node?  If it did ever fail
+  //    and left the node in CLOSING, the RS would have aborted and we'd process
+  //    these regions in server shutdown
+  //
+  //    // Region of enabled table being closed but not complete
+  //    // Region is already assigned, don't say anything to RS but set ZK closing
+  //    region = enabledAndAssignedRegions.remove(0);
+  //    regionsThatShouldBeOnline.add(region);
+  //    ZKAssign.createNodeClosing(zkw, region, serverName);
+  //
+  //    // Region of disabled table being closed but not complete
+  //    // Region is already assigned, don't say anything to RS but set ZK closing
+  //    region = disabledAndAssignedRegions.remove(0);
+  //    regionsThatShouldBeOffline.add(region);
+  //    ZKAssign.createNodeClosing(zkw, region, serverName);
+
+      /*
+       * ZK = CLOSED
+       */
+
+      // Region of enabled table closed but not ack
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      int version = ZKAssign.createNodeClosing(zkw, region, serverName);
+      ZKAssign.transitionNodeClosed(zkw, region, serverName, version);
+
+      // Region of disabled table closed but not ack
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      version = ZKAssign.createNodeClosing(zkw, region, serverName);
+      ZKAssign.transitionNodeClosed(zkw, region, serverName, version);
+
+      /*
+       * ZK = OPENING
+       */
+
+      // RS was opening a region of enabled table but never finishes
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, serverName);
+      ZKAssign.transitionNodeOpening(zkw, region, serverName);
+
+      /*
+       * ZK = OPENED
+       */
+
+      // Region of enabled table was opened on RS
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, serverName);
+      hrs.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          break;
+        }
+        Thread.sleep(100);
+      }
+
+      // Region of disable table was opened on RS
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, serverName);
+      hrs.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          break;
+        }
+        Thread.sleep(100);
+      }
+
+      /*
+       * ZK = NONE
+       */
+
+      /*
+       * DONE MOCKING
+       */
+
+      log("Done mocking data up in ZK");
+
+      // Start up a new master
+      log("Starting up a new master");
+      master = cluster.startMaster().getMaster();
+      log("Waiting for master to be ready");
+      cluster.waitForActiveAndReadyMaster();
+      log("Master is ready");
+
+      // Failover should be completed, now wait for no RIT
+      log("Waiting for no more RIT");
+      ZKAssign.blockUntilNoRIT(zkw);
+      log("No more RIT in ZK, now doing final test verification");
+
+      // Grab all the regions that are online across RSs
+      Set<HRegionInfo> onlineRegions = new TreeSet<HRegionInfo>();
+      for (JVMClusterUtil.RegionServerThread rst :
+        cluster.getRegionServerThreads()) {
+        onlineRegions.addAll(rst.getRegionServer().getOnlineRegions());
+      }
+
+      // Now, everything that should be online should be online
+      for (HRegionInfo hri : regionsThatShouldBeOnline) {
+        assertTrue(onlineRegions.contains(hri));
+      }
+
+      // Everything that should be offline should not be online
+      for (HRegionInfo hri : regionsThatShouldBeOffline) {
+        assertFalse(onlineRegions.contains(hri));
+      }
+
+      log("Done with verification, all passed, shutting down cluster");
+    } finally {
+      // Done, shutdown the cluster
+      TEST_UTIL.shutdownMiniCluster();
     }
-
-    /*
-     * ZK = NONE
-     */
-
-    /*
-     * DONE MOCKING
-     */
-
-    log("Done mocking data up in ZK");
-
-    // Start up a new master
-    log("Starting up a new master");
-    master = cluster.startMaster().getMaster();
-    log("Waiting for master to be ready");
-    cluster.waitForActiveAndReadyMaster();
-    log("Master is ready");
-
-    // Failover should be completed, now wait for no RIT
-    log("Waiting for no more RIT");
-    ZKAssign.blockUntilNoRIT(zkw);
-    log("No more RIT in ZK, now doing final test verification");
-
-    // Grab all the regions that are online across RSs
-    Set<HRegionInfo> onlineRegions = new TreeSet<HRegionInfo>();
-    for (JVMClusterUtil.RegionServerThread rst :
-      cluster.getRegionServerThreads()) {
-      onlineRegions.addAll(rst.getRegionServer().getOnlineRegions());
-    }
-
-    // Now, everything that should be online should be online
-    for (HRegionInfo hri : regionsThatShouldBeOnline) {
-      assertTrue(onlineRegions.contains(hri));
-    }
-
-    // Everything that should be offline should not be online
-    for (HRegionInfo hri : regionsThatShouldBeOffline) {
-      assertFalse(onlineRegions.contains(hri));
-    }
-
-    log("Done with verification, all passed, shutting down cluster");
-
-    // Done, shutdown the cluster
-    TEST_UTIL.shutdownMiniCluster();
   }
 
 
@@ -626,384 +630,386 @@ public class TestMasterFailover {
 
     // Create and start the cluster
     HBaseTestingUtility TEST_UTIL = new HBaseTestingUtility(conf);
-    TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
-    MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
-    log("Cluster started");
+    try {
+      TEST_UTIL.startMiniCluster(NUM_MASTERS, NUM_RS);
+      MiniHBaseCluster cluster = TEST_UTIL.getHBaseCluster();
+      log("Cluster started");
 
-    // Create a ZKW to use in the test
-    ZooKeeperWatcher zkw = new ZooKeeperWatcher(TEST_UTIL.getConfiguration(),
-        "unittest", new Abortable() {
-          
-          @Override
-          public void abort(String why, Throwable e) {
-            LOG.error("Fatal ZK Error: " + why, e);
-            org.junit.Assert.assertFalse("Fatal ZK error", true);
-          }
-          
-          @Override
-          public boolean isAborted() {
-            return false;
-          }
-          
-    });
+      // Create a ZKW to use in the test
+      ZooKeeperWatcher zkw = new ZooKeeperWatcher(TEST_UTIL.getConfiguration(),
+          "unittest", new Abortable() {
 
-    // get all the master threads
-    List<MasterThread> masterThreads = cluster.getMasterThreads();
-    assertEquals(1, masterThreads.size());
+            @Override
+            public void abort(String why, Throwable e) {
+              LOG.error("Fatal ZK Error: " + why, e);
+              org.junit.Assert.assertFalse("Fatal ZK error", true);
+            }
 
-    // only one master thread, let's wait for it to be initialized
-    assertTrue(cluster.waitForActiveAndReadyMaster());
-    HMaster master = masterThreads.get(0).getMaster();
-    assertTrue(master.isActiveMaster());
-    assertTrue(master.isInitialized());
+            @Override
+            public boolean isAborted() {
+              return false;
+            }
 
-    // disable load balancing on this master
-    master.balanceSwitch(false);
+      });
 
-    // create two tables in META, each with 10 regions
-    byte [] FAMILY = Bytes.toBytes("family");
-    byte [][] SPLIT_KEYS = new byte [][] {
-        new byte[0], Bytes.toBytes("aaa"), Bytes.toBytes("bbb"),
-        Bytes.toBytes("ccc"), Bytes.toBytes("ddd"), Bytes.toBytes("eee"),
-        Bytes.toBytes("fff"), Bytes.toBytes("ggg"), Bytes.toBytes("hhh"),
-        Bytes.toBytes("iii"), Bytes.toBytes("jjj")
-    };
+      // get all the master threads
+      List<MasterThread> masterThreads = cluster.getMasterThreads();
+      assertEquals(1, masterThreads.size());
 
-    byte [] enabledTable = Bytes.toBytes("enabledTable");
-    HTableDescriptor htdEnabled = new HTableDescriptor(enabledTable);
-    htdEnabled.addFamily(new HColumnDescriptor(FAMILY));
-    FileSystem filesystem = FileSystem.get(conf);
-    Path rootdir = filesystem.makeQualified(
-           new Path(conf.get(HConstants.HBASE_DIR)));
-    // Write the .tableinfo
-    FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdEnabled);
-    HRegionInfo hriEnabled = new HRegionInfo(htdEnabled.getName(),
-        null, null);
-    HRegion.createHRegion(hriEnabled, rootdir, conf, htdEnabled);
+      // only one master thread, let's wait for it to be initialized
+      assertTrue(cluster.waitForActiveAndReadyMaster());
+      HMaster master = masterThreads.get(0).getMaster();
+      assertTrue(master.isActiveMaster());
+      assertTrue(master.isInitialized());
 
-    List<HRegionInfo> enabledRegions = TEST_UTIL.createMultiRegionsInMeta(
-        TEST_UTIL.getConfiguration(), htdEnabled, SPLIT_KEYS);
+      // disable load balancing on this master
+      master.balanceSwitch(false);
 
-    byte [] disabledTable = Bytes.toBytes("disabledTable");
-    HTableDescriptor htdDisabled = new HTableDescriptor(disabledTable);
-    htdDisabled.addFamily(new HColumnDescriptor(FAMILY));
-    // Write the .tableinfo
-    FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdDisabled);
-    HRegionInfo hriDisabled = new HRegionInfo(htdDisabled.getName(), null, null);
-    HRegion.createHRegion(hriDisabled, rootdir, conf, htdDisabled);
+      // create two tables in META, each with 10 regions
+      byte [] FAMILY = Bytes.toBytes("family");
+      byte [][] SPLIT_KEYS = new byte [][] {
+          new byte[0], Bytes.toBytes("aaa"), Bytes.toBytes("bbb"),
+          Bytes.toBytes("ccc"), Bytes.toBytes("ddd"), Bytes.toBytes("eee"),
+          Bytes.toBytes("fff"), Bytes.toBytes("ggg"), Bytes.toBytes("hhh"),
+          Bytes.toBytes("iii"), Bytes.toBytes("jjj")
+      };
 
-    List<HRegionInfo> disabledRegions = TEST_UTIL.createMultiRegionsInMeta(
-        TEST_UTIL.getConfiguration(), htdDisabled, SPLIT_KEYS);
+      byte [] enabledTable = Bytes.toBytes("enabledTable");
+      HTableDescriptor htdEnabled = new HTableDescriptor(enabledTable);
+      htdEnabled.addFamily(new HColumnDescriptor(FAMILY));
+      FileSystem filesystem = FileSystem.get(conf);
+      Path rootdir = filesystem.makeQualified(
+             new Path(conf.get(HConstants.HBASE_DIR)));
+      // Write the .tableinfo
+      FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdEnabled);
+      HRegionInfo hriEnabled = new HRegionInfo(htdEnabled.getName(),
+          null, null);
+      HRegion.createHRegion(hriEnabled, rootdir, conf, htdEnabled);
 
-    log("Regions in META have been created");
+      List<HRegionInfo> enabledRegions = TEST_UTIL.createMultiRegionsInMeta(
+          TEST_UTIL.getConfiguration(), htdEnabled, SPLIT_KEYS);
 
-    // at this point we only expect 2 regions to be assigned out (catalogs)
-    assertEquals(2, cluster.countServedRegions());
+      byte [] disabledTable = Bytes.toBytes("disabledTable");
+      HTableDescriptor htdDisabled = new HTableDescriptor(disabledTable);
+      htdDisabled.addFamily(new HColumnDescriptor(FAMILY));
+      // Write the .tableinfo
+      FSTableDescriptors.createTableDescriptor(filesystem, rootdir, htdDisabled);
+      HRegionInfo hriDisabled = new HRegionInfo(htdDisabled.getName(), null, null);
+      HRegion.createHRegion(hriDisabled, rootdir, conf, htdDisabled);
 
-    // The first RS will stay online
-    List<RegionServerThread> regionservers =
-      cluster.getRegionServerThreads();
-    HRegionServer hrs = regionservers.get(0).getRegionServer();
+      List<HRegionInfo> disabledRegions = TEST_UTIL.createMultiRegionsInMeta(
+          TEST_UTIL.getConfiguration(), htdDisabled, SPLIT_KEYS);
 
-    // The second RS is going to be hard-killed
-    RegionServerThread hrsDeadThread = regionservers.get(1);
-    HRegionServer hrsDead = hrsDeadThread.getRegionServer();
-    ServerName deadServerName = hrsDead.getServerName();
+      log("Regions in META have been created");
 
-    // we'll need some regions to already be assigned out properly on live RS
-    List<HRegionInfo> enabledAndAssignedRegions = new ArrayList<HRegionInfo>();
-    enabledAndAssignedRegions.add(enabledRegions.remove(0));
-    enabledAndAssignedRegions.add(enabledRegions.remove(0));
-    List<HRegionInfo> disabledAndAssignedRegions = new ArrayList<HRegionInfo>();
-    disabledAndAssignedRegions.add(disabledRegions.remove(0));
-    disabledAndAssignedRegions.add(disabledRegions.remove(0));
+      // at this point we only expect 2 regions to be assigned out (catalogs)
+      assertEquals(2, cluster.countServedRegions());
 
-    // now actually assign them
-    for (HRegionInfo hri : enabledAndAssignedRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, hrs.getServerName()));
-      master.assignRegion(hri);
-    }
-    for (HRegionInfo hri : disabledAndAssignedRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, hrs.getServerName()));
-      master.assignRegion(hri);
-    }
+      // The first RS will stay online
+      List<RegionServerThread> regionservers =
+        cluster.getRegionServerThreads();
+      HRegionServer hrs = regionservers.get(0).getRegionServer();
 
-    // we also need regions assigned out on the dead server
-    List<HRegionInfo> enabledAndOnDeadRegions = new ArrayList<HRegionInfo>();
-    enabledAndOnDeadRegions.add(enabledRegions.remove(0));
-    enabledAndOnDeadRegions.add(enabledRegions.remove(0));
-    List<HRegionInfo> disabledAndOnDeadRegions = new ArrayList<HRegionInfo>();
-    disabledAndOnDeadRegions.add(disabledRegions.remove(0));
-    disabledAndOnDeadRegions.add(disabledRegions.remove(0));
+      // The second RS is going to be hard-killed
+      RegionServerThread hrsDeadThread = regionservers.get(1);
+      HRegionServer hrsDead = hrsDeadThread.getRegionServer();
+      ServerName deadServerName = hrsDead.getServerName();
 
-    // set region plan to server to be killed and trigger assign
-    for (HRegionInfo hri : enabledAndOnDeadRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, deadServerName));
-      master.assignRegion(hri);
-    }
-    for (HRegionInfo hri : disabledAndOnDeadRegions) {
-      master.assignmentManager.regionPlans.put(hri.getEncodedName(),
-          new RegionPlan(hri, null, deadServerName));
-      master.assignRegion(hri);
-    }
+      // we'll need some regions to already be assigned out properly on live RS
+      List<HRegionInfo> enabledAndAssignedRegions = new ArrayList<HRegionInfo>();
+      enabledAndAssignedRegions.add(enabledRegions.remove(0));
+      enabledAndAssignedRegions.add(enabledRegions.remove(0));
+      List<HRegionInfo> disabledAndAssignedRegions = new ArrayList<HRegionInfo>();
+      disabledAndAssignedRegions.add(disabledRegions.remove(0));
+      disabledAndAssignedRegions.add(disabledRegions.remove(0));
 
-    // wait for no more RIT
-    log("Waiting for assignment to finish");
-    ZKAssign.blockUntilNoRIT(zkw);
-    log("Assignment completed");
-
-    // Stop the master
-    log("Aborting master");
-    cluster.abortMaster(0);
-    cluster.waitOnMaster(0);
-    log("Master has aborted");
-
-    /*
-     * Now, let's start mocking up some weird states as described in the method
-     * javadoc.
-     */
-
-    List<HRegionInfo> regionsThatShouldBeOnline = new ArrayList<HRegionInfo>();
-    List<HRegionInfo> regionsThatShouldBeOffline = new ArrayList<HRegionInfo>();
-
-    log("Beginning to mock scenarios");
-
-    // Disable the disabledTable in ZK
-    ZKTable zktable = new ZKTable(zkw);
-    zktable.setDisabledTable(Bytes.toString(disabledTable));
-
-    /*
-     * ZK = CLOSING
-     */
-
-    // Region of enabled table being closed on dead RS but not finished
-    HRegionInfo region = enabledAndOnDeadRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeClosing(zkw, region, deadServerName);
-    LOG.debug("\n\nRegion of enabled table was CLOSING on dead RS\n" +
-        region + "\n\n");
-
-    // Region of disabled table being closed on dead RS but not finished
-    region = disabledAndOnDeadRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    ZKAssign.createNodeClosing(zkw, region, deadServerName);
-    LOG.debug("\n\nRegion of disabled table was CLOSING on dead RS\n" +
-        region + "\n\n");
-
-    /*
-     * ZK = CLOSED
-     */
-
-    // Region of enabled on dead server gets closed but not ack'd by master
-    region = enabledAndOnDeadRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    int version = ZKAssign.createNodeClosing(zkw, region, deadServerName);
-    ZKAssign.transitionNodeClosed(zkw, region, deadServerName, version);
-    LOG.debug("\n\nRegion of enabled table was CLOSED on dead RS\n" +
-        region + "\n\n");
-
-    // Region of disabled on dead server gets closed but not ack'd by master
-    region = disabledAndOnDeadRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    version = ZKAssign.createNodeClosing(zkw, region, deadServerName);
-    ZKAssign.transitionNodeClosed(zkw, region, deadServerName, version);
-    LOG.debug("\n\nRegion of disabled table was CLOSED on dead RS\n" +
-        region + "\n\n");
-
-    /*
-     * ZK = OPENING
-     */
-
-    // RS was opening a region of enabled table then died
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    ZKAssign.transitionNodeOpening(zkw, region, deadServerName);
-    LOG.debug("\n\nRegion of enabled table was OPENING on dead RS\n" +
-        region + "\n\n");
-
-    // RS was opening a region of disabled table then died
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    ZKAssign.transitionNodeOpening(zkw, region, deadServerName);
-    LOG.debug("\n\nRegion of disabled table was OPENING on dead RS\n" +
-        region + "\n\n");
-
-    /*
-     * ZK = OPENED
-     */
-
-    // Region of enabled table was opened on dead RS
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    hrsDead.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        break;
+      // now actually assign them
+      for (HRegionInfo hri : enabledAndAssignedRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, hrs.getServerName()));
+        master.assignRegion(hri);
       }
-      Thread.sleep(100);
-    }
-    LOG.debug("\n\nRegion of enabled table was OPENED on dead RS\n" +
-        region + "\n\n");
-
-    // Region of disabled table was opened on dead RS
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    hrsDead.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        break;
+      for (HRegionInfo hri : disabledAndAssignedRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, hrs.getServerName()));
+        master.assignRegion(hri);
       }
-      Thread.sleep(100);
-    }
-    LOG.debug("\n\nRegion of disabled table was OPENED on dead RS\n" +
-        region + "\n\n");
 
-    /*
-     * ZK = NONE
-     */
+      // we also need regions assigned out on the dead server
+      List<HRegionInfo> enabledAndOnDeadRegions = new ArrayList<HRegionInfo>();
+      enabledAndOnDeadRegions.add(enabledRegions.remove(0));
+      enabledAndOnDeadRegions.add(enabledRegions.remove(0));
+      List<HRegionInfo> disabledAndOnDeadRegions = new ArrayList<HRegionInfo>();
+      disabledAndOnDeadRegions.add(disabledRegions.remove(0));
+      disabledAndOnDeadRegions.add(disabledRegions.remove(0));
 
-    // Region of enabled table was open at steady-state on dead RS
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    hrsDead.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        ZKAssign.deleteOpenedNode(zkw, region.getEncodedName());
-        break;
+      // set region plan to server to be killed and trigger assign
+      for (HRegionInfo hri : enabledAndOnDeadRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, deadServerName));
+        master.assignRegion(hri);
       }
-      Thread.sleep(100);
-    }
-    LOG.debug("\n\nRegion of enabled table was open at steady-state on dead RS"
+      for (HRegionInfo hri : disabledAndOnDeadRegions) {
+        master.assignmentManager.regionPlans.put(hri.getEncodedName(),
+            new RegionPlan(hri, null, deadServerName));
+        master.assignRegion(hri);
+      }
+
+      // wait for no more RIT
+      log("Waiting for assignment to finish");
+      ZKAssign.blockUntilNoRIT(zkw);
+      log("Assignment completed");
+
+      // Stop the master
+      log("Aborting master");
+      cluster.abortMaster(0);
+      cluster.waitOnMaster(0);
+      log("Master has aborted");
+
+      /*
+       * Now, let's start mocking up some weird states as described in the method
+       * javadoc.
+       */
+
+      List<HRegionInfo> regionsThatShouldBeOnline = new ArrayList<HRegionInfo>();
+      List<HRegionInfo> regionsThatShouldBeOffline = new ArrayList<HRegionInfo>();
+
+      log("Beginning to mock scenarios");
+
+      // Disable the disabledTable in ZK
+      ZKTable zktable = new ZKTable(zkw);
+      zktable.setDisabledTable(Bytes.toString(disabledTable));
+
+      /*
+       * ZK = CLOSING
+       */
+
+      // Region of enabled table being closed on dead RS but not finished
+      HRegionInfo region = enabledAndOnDeadRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeClosing(zkw, region, deadServerName);
+      LOG.debug("\n\nRegion of enabled table was CLOSING on dead RS\n" +
+          region + "\n\n");
+
+      // Region of disabled table being closed on dead RS but not finished
+      region = disabledAndOnDeadRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      ZKAssign.createNodeClosing(zkw, region, deadServerName);
+      LOG.debug("\n\nRegion of disabled table was CLOSING on dead RS\n" +
+          region + "\n\n");
+
+      /*
+       * ZK = CLOSED
+       */
+
+      // Region of enabled on dead server gets closed but not ack'd by master
+      region = enabledAndOnDeadRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      int version = ZKAssign.createNodeClosing(zkw, region, deadServerName);
+      ZKAssign.transitionNodeClosed(zkw, region, deadServerName, version);
+      LOG.debug("\n\nRegion of enabled table was CLOSED on dead RS\n" +
+          region + "\n\n");
+
+      // Region of disabled on dead server gets closed but not ack'd by master
+      region = disabledAndOnDeadRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      version = ZKAssign.createNodeClosing(zkw, region, deadServerName);
+      ZKAssign.transitionNodeClosed(zkw, region, deadServerName, version);
+      LOG.debug("\n\nRegion of disabled table was CLOSED on dead RS\n" +
+          region + "\n\n");
+
+      /*
+       * ZK = OPENING
+       */
+
+      // RS was opening a region of enabled table then died
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      ZKAssign.transitionNodeOpening(zkw, region, deadServerName);
+      LOG.debug("\n\nRegion of enabled table was OPENING on dead RS\n" +
+          region + "\n\n");
+
+      // RS was opening a region of disabled table then died
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      ZKAssign.transitionNodeOpening(zkw, region, deadServerName);
+      LOG.debug("\n\nRegion of disabled table was OPENING on dead RS\n" +
+          region + "\n\n");
+
+      /*
+       * ZK = OPENED
+       */
+
+      // Region of enabled table was opened on dead RS
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      hrsDead.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          break;
+        }
+        Thread.sleep(100);
+      }
+      LOG.debug("\n\nRegion of enabled table was OPENED on dead RS\n" +
+          region + "\n\n");
+
+      // Region of disabled table was opened on dead RS
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      hrsDead.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          break;
+        }
+        Thread.sleep(100);
+      }
+      LOG.debug("\n\nRegion of disabled table was OPENED on dead RS\n" +
+          region + "\n\n");
+
+      /*
+       * ZK = NONE
+       */
+
+      // Region of enabled table was open at steady-state on dead RS
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      hrsDead.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          ZKAssign.deleteOpenedNode(zkw, region.getEncodedName());
+          break;
+        }
+        Thread.sleep(100);
+      }
+      LOG.debug("\n\nRegion of enabled table was open at steady-state on dead RS"
+          + "\n" + region + "\n\n");
+
+      // Region of disabled table was open at steady-state on dead RS
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      ZKAssign.createNodeOffline(zkw, region, deadServerName);
+      hrsDead.openRegion(region);
+      while (true) {
+        RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
+        if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
+          ZKAssign.deleteOpenedNode(zkw, region.getEncodedName());
+          break;
+        }
+        Thread.sleep(100);
+      }
+      LOG.debug("\n\nRegion of disabled table was open at steady-state on dead RS"
         + "\n" + region + "\n\n");
 
-    // Region of disabled table was open at steady-state on dead RS
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    ZKAssign.createNodeOffline(zkw, region, deadServerName);
-    hrsDead.openRegion(region);
-    while (true) {
-      RegionTransitionData rtd = ZKAssign.getData(zkw, region.getEncodedName());
-      if (rtd != null && rtd.getEventType() == EventType.RS_ZK_REGION_OPENED) {
-        ZKAssign.deleteOpenedNode(zkw, region.getEncodedName());
-        break;
+      /*
+       * DONE MOCKING
+       */
+
+      log("Done mocking data up in ZK");
+
+      // Kill the RS that had a hard death
+      log("Killing RS " + deadServerName);
+      hrsDead.abort("Killing for unit test");
+      log("RS " + deadServerName + " killed");
+
+      // Start up a new master.  Wait until regionserver is completely down
+      // before starting new master because of hbase-4511.
+      while (hrsDeadThread.isAlive()) {
+        Threads.sleep(10);
       }
-      Thread.sleep(100);
-    }
-    LOG.debug("\n\nRegion of disabled table was open at steady-state on dead RS"
-      + "\n" + region + "\n\n");
+      log("Starting up a new master");
+      master = cluster.startMaster().getMaster();
+      log("Waiting for master to be ready");
+      assertTrue(cluster.waitForActiveAndReadyMaster());
+      log("Master is ready");
 
-    /*
-     * DONE MOCKING
-     */
+      // Let's add some weird states to master in-memory state
 
-    log("Done mocking data up in ZK");
+      // After HBASE-3181, we need to have some ZK state if we're PENDING_OPEN
+      // b/c it is impossible for us to get into this state w/o a zk node
+      // this is not true of PENDING_CLOSE
 
-    // Kill the RS that had a hard death
-    log("Killing RS " + deadServerName);
-    hrsDead.abort("Killing for unit test");
-    log("RS " + deadServerName + " killed");
+      // PENDING_OPEN and enabled
+      region = enabledRegions.remove(0);
+      regionsThatShouldBeOnline.add(region);
+      master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
+          new RegionState(region, RegionState.State.PENDING_OPEN, 0, null));
+      ZKAssign.createNodeOffline(zkw, region, master.getServerName());
+      // PENDING_OPEN and disabled
+      region = disabledRegions.remove(0);
+      regionsThatShouldBeOffline.add(region);
+      master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
+          new RegionState(region, RegionState.State.PENDING_OPEN, 0, null));
+      ZKAssign.createNodeOffline(zkw, region, master.getServerName());
+      // This test is bad.  It puts up a PENDING_CLOSE but doesn't say what
+      // server we were PENDING_CLOSE against -- i.e. an entry in
+      // AssignmentManager#regions.  W/o a server, we NPE trying to resend close.
+      // In past, there was wonky logic that had us reassign region if no server
+      // at tail of the unassign.  This was removed.  Commenting out for now.
+      // TODO: Remove completely.
+      /*
+      // PENDING_CLOSE and enabled
+      region = enabledRegions.remove(0);
+      LOG.info("Setting PENDING_CLOSE enabled " + region.getEncodedName());
+      regionsThatShouldBeOnline.add(region);
+      master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
+        new RegionState(region, RegionState.State.PENDING_CLOSE, 0));
+      // PENDING_CLOSE and disabled
+      region = disabledRegions.remove(0);
+      LOG.info("Setting PENDING_CLOSE disabled " + region.getEncodedName());
+      regionsThatShouldBeOffline.add(region);
+      master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
+        new RegionState(region, RegionState.State.PENDING_CLOSE, 0));
+        */
 
-    // Start up a new master.  Wait until regionserver is completely down
-    // before starting new master because of hbase-4511.
-    while (hrsDeadThread.isAlive()) {
-      Threads.sleep(10);
-    }
-    log("Starting up a new master");
-    master = cluster.startMaster().getMaster();
-    log("Waiting for master to be ready");
-    assertTrue(cluster.waitForActiveAndReadyMaster());
-    log("Master is ready");
-
-    // Let's add some weird states to master in-memory state
-
-    // After HBASE-3181, we need to have some ZK state if we're PENDING_OPEN
-    // b/c it is impossible for us to get into this state w/o a zk node
-    // this is not true of PENDING_CLOSE
-
-    // PENDING_OPEN and enabled
-    region = enabledRegions.remove(0);
-    regionsThatShouldBeOnline.add(region);
-    master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
-        new RegionState(region, RegionState.State.PENDING_OPEN, 0, null));
-    ZKAssign.createNodeOffline(zkw, region, master.getServerName());
-    // PENDING_OPEN and disabled
-    region = disabledRegions.remove(0);
-    regionsThatShouldBeOffline.add(region);
-    master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
-        new RegionState(region, RegionState.State.PENDING_OPEN, 0, null));
-    ZKAssign.createNodeOffline(zkw, region, master.getServerName());
-    // This test is bad.  It puts up a PENDING_CLOSE but doesn't say what
-    // server we were PENDING_CLOSE against -- i.e. an entry in
-    // AssignmentManager#regions.  W/o a server, we NPE trying to resend close.
-    // In past, there was wonky logic that had us reassign region if no server
-    // at tail of the unassign.  This was removed.  Commenting out for now.
-    // TODO: Remove completely.
-    /*
-    // PENDING_CLOSE and enabled
-    region = enabledRegions.remove(0);
-    LOG.info("Setting PENDING_CLOSE enabled " + region.getEncodedName());
-    regionsThatShouldBeOnline.add(region);
-    master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
-      new RegionState(region, RegionState.State.PENDING_CLOSE, 0));
-    // PENDING_CLOSE and disabled
-    region = disabledRegions.remove(0);
-    LOG.info("Setting PENDING_CLOSE disabled " + region.getEncodedName());
-    regionsThatShouldBeOffline.add(region);
-    master.assignmentManager.regionsInTransition.put(region.getEncodedName(),
-      new RegionState(region, RegionState.State.PENDING_CLOSE, 0));
-      */
-
-    // Failover should be completed, now wait for no RIT
-    log("Waiting for no more RIT");
-    ZKAssign.blockUntilNoRIT(zkw);
-    log("No more RIT in ZK");
-    long now = System.currentTimeMillis();
-    final long maxTime = 120000;
-    boolean done = master.assignmentManager.waitUntilNoRegionsInTransition(maxTime);
-    if (!done) {
-      LOG.info("rit=" + master.assignmentManager.getRegionsInTransition());
-    }
-    long elapsed = System.currentTimeMillis() - now;
-    assertTrue("Elapsed=" + elapsed + ", maxTime=" + maxTime + ", done=" + done,
-      elapsed < maxTime);
-    log("No more RIT in RIT map, doing final test verification");
-
-    // Grab all the regions that are online across RSs
-    Set<HRegionInfo> onlineRegions = new TreeSet<HRegionInfo>();
-    for (JVMClusterUtil.RegionServerThread rst :
-        cluster.getRegionServerThreads()) {
-      try {
-        onlineRegions.addAll(rst.getRegionServer().getOnlineRegions());
-      } catch (org.apache.hadoop.hbase.regionserver.RegionServerStoppedException e) {
-        LOG.info("Got RegionServerStoppedException", e);
+      // Failover should be completed, now wait for no RIT
+      log("Waiting for no more RIT");
+      ZKAssign.blockUntilNoRIT(zkw);
+      log("No more RIT in ZK");
+      long now = System.currentTimeMillis();
+      final long maxTime = 120000;
+      boolean done = master.assignmentManager.waitUntilNoRegionsInTransition(maxTime);
+      if (!done) {
+        LOG.info("rit=" + master.assignmentManager.getRegionsInTransition());
       }
+      long elapsed = System.currentTimeMillis() - now;
+      assertTrue("Elapsed=" + elapsed + ", maxTime=" + maxTime + ", done=" + done,
+        elapsed < maxTime);
+      log("No more RIT in RIT map, doing final test verification");
+
+      // Grab all the regions that are online across RSs
+      Set<HRegionInfo> onlineRegions = new TreeSet<HRegionInfo>();
+      for (JVMClusterUtil.RegionServerThread rst :
+          cluster.getRegionServerThreads()) {
+        try {
+          onlineRegions.addAll(rst.getRegionServer().getOnlineRegions());
+        } catch (org.apache.hadoop.hbase.regionserver.RegionServerStoppedException e) {
+          LOG.info("Got RegionServerStoppedException", e);
+        }
+      }
+
+      // Now, everything that should be online should be online
+      for (HRegionInfo hri : regionsThatShouldBeOnline) {
+        assertTrue("region=" + hri.getRegionNameAsString(), onlineRegions.contains(hri));
+      }
+
+      // Everything that should be offline should not be online
+      for (HRegionInfo hri : regionsThatShouldBeOffline) {
+        assertFalse(onlineRegions.contains(hri));
+      }
+
+      log("Done with verification, all passed, shutting down cluster");
+    } finally {
+      // Done, shutdown the cluster
+      TEST_UTIL.shutdownMiniCluster();
     }
-
-    // Now, everything that should be online should be online
-    for (HRegionInfo hri : regionsThatShouldBeOnline) {
-      assertTrue("region=" + hri.getRegionNameAsString(), onlineRegions.contains(hri));
-    }
-
-    // Everything that should be offline should not be online
-    for (HRegionInfo hri : regionsThatShouldBeOffline) {
-      assertFalse(onlineRegions.contains(hri));
-    }
-
-    log("Done with verification, all passed, shutting down cluster");
-
-    // Done, shutdown the cluster
-    TEST_UTIL.shutdownMiniCluster();
   }
 
   // TODO: Next test to add is with testing permutations of the RIT or the RS
