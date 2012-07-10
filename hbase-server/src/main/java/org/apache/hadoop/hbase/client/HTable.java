@@ -55,6 +55,7 @@ import org.apache.hadoop.hbase.client.HConnectionManager.HConnectable;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.filter.BinaryComparator;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.ipc.ExecRPCInvoker;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
@@ -1335,8 +1336,10 @@ public class HTable implements HTableInterface {
 
   /**
    * {@inheritDoc}
+   * @deprecated since 0.96
    */
   @Override
+  @Deprecated
   public <T extends CoprocessorProtocol> T coprocessorProxy(
       Class<T> protocol, byte[] row) {
     return (T)Proxy.newProxyInstance(this.getClass().getClassLoader(),
@@ -1346,6 +1349,11 @@ public class HTable implements HTableInterface {
             protocol,
             tableName,
             row));
+  }
+
+  public CoprocessorRpcChannel coprocessorService(byte[] row)
+      throws Exception {
+    return new CoprocessorRpcChannel(row);
   }
 
   /**

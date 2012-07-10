@@ -27,6 +27,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.List;
 import java.util.Map;
 
+import com.google.protobuf.BlockingRpcChannel;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.RpcChannel;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.Coprocessor;
 import org.apache.hadoop.hbase.HBaseTestingUtility;
@@ -52,6 +55,7 @@ import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
 import org.apache.hadoop.hbase.coprocessor.ObserverContext;
 import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
 import org.apache.hadoop.hbase.master.MasterCoprocessorHost;
+import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.RegionCoprocessorHost;
 import org.apache.hadoop.hbase.security.AccessDeniedException;
@@ -128,31 +132,63 @@ public class TestAccessController {
 
     // initilize access control
     HTable meta = new HTable(conf, AccessControlLists.ACL_TABLE_NAME);
-    AccessControllerProtocol protocol = meta.coprocessorProxy(AccessControllerProtocol.class,
-      TEST_TABLE);
+    BlockingRpcChannel service = meta.coprocessorService(TEST_TABLE);
+    AccessControlProtos.AccessControlService.BlockingInterface protocol =
+        AccessControlProtos.AccessControlService.newBlockingStub(service);
 
     HRegion region = TEST_UTIL.getHBaseCluster().getRegions(TEST_TABLE).get(0);
     RegionCoprocessorHost rcpHost = region.getCoprocessorHost();
     RCP_ENV = rcpHost.createEnvironment(AccessController.class, ACCESS_CONTROLLER,
       Coprocessor.PRIORITY_HIGHEST, 1, conf);
 
-    protocol.grant(new UserPermission(Bytes.toBytes(USER_ADMIN.getShortName()),
-        Permission.Action.ADMIN, Permission.Action.CREATE, Permission.Action.READ,
-        Permission.Action.WRITE));
+    protocol.grant(null, newGrantRequest(USER_ADMIN.getShortName(), TEST_TABLE,
+        null, null,
+        AccessControlProtos.Permission.Action.ADMIN,
+        AccessControlProtos.Permission.Action.CREATE,
+        AccessControlProtos.Permission.Action.READ,
+        AccessControlProtos.Permission.Action.WRITE));
 
-    protocol.grant(new UserPermission(Bytes.toBytes(USER_RW.getShortName()), TEST_TABLE,
-        TEST_FAMILY, Permission.Action.READ, Permission.Action.WRITE));
+    protocol.grant(null, newGrantRequest(USER_RW.getShortName(), TEST_TABLE,
+        TEST_FAMILY, null,
+        AccessControlProtos.Permission.Action.READ,
+        AccessControlProtos.Permission.Action.WRITE));
 
-    protocol.grant(new UserPermission(Bytes.toBytes(USER_RO.getShortName()), TEST_TABLE,
-        TEST_FAMILY, Permission.Action.READ));
+    protocol.grant(null, newGrantRequest(USER_RO.getShortName(), TEST_TABLE,
+        TEST_FAMILY, null, AccessControlProtos.Permission.Action.READ));
 
-    protocol.grant(new UserPermission(Bytes.toBytes(USER_CREATE.getShortName()), TEST_TABLE, null,
-        Permission.Action.CREATE));
+    protocol.grant(null, newGrantRequest(USER_CREATE.getShortName(),
+        TEST_TABLE, null, null, AccessControlProtos.Permission.Action.CREATE));
   }
 
   @AfterClass
   public static void tearDownAfterClass() throws Exception {
     TEST_UTIL.shutdownMiniCluster();
+  }
+
+  private static AccessControlProtos.GrantRequest newGrantRequest(
+      String username, byte[] table, byte[] family, byte[] qualifier,
+      AccessControlProtos.Permission.Action... actions) {
+    AccessControlProtos.Permission.Builder permissionBuilder =
+        AccessControlProtos.Permission.newBuilder();
+    for (AccessControlProtos.Permission.Action a : actions) {
+      permissionBuilder.addAction(a);
+    }
+    if (table != null) {
+      permissionBuilder.setTable(ByteString.copyFrom(table));
+    }
+    if (family != null) {
+      permissionBuilder.setFamily(ByteString.copyFrom(family));
+    }
+    if (qualifier != null) {
+      permissionBuilder.setQualifier(ByteString.copyFrom(qualifier));
+    }
+
+    return AccessControlProtos.GrantRequest.newBuilder()
+        .setPermission(
+            AccessControlProtos.UserPermission.newBuilder()
+                .setUser(ByteString.copyFromUtf8(username))
+                .setPermission(permissionBuilder.build())
+        ).build();
   }
 
   public void verifyAllowed(User user, PrivilegedExceptionAction... actions) throws Exception {
