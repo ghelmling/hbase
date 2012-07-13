@@ -226,6 +226,9 @@ import com.google.common.base.Function;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.RpcController;
 
+import static org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceRequest;
+import static org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceResponse;
+
 /**
  * HRegionServer makes a set of HRegions available to clients. It checks in with
  * the HMaster. There are many HRegionServers in a single HBase deployment.
@@ -3204,6 +3207,13 @@ public class  HRegionServer implements ClientProtocol,
     } catch (IOException ie) {
       throw new ServiceException(ie);
     }
+  }
+
+  @Override
+  public CoprocessorServiceResponse execService(final RpcController controller,
+      final CoprocessorServiceRequest request) throws ServiceException {
+    // FIXME: needs similar implementation to execCoprocessor
+    return null;
   }
 
   /**

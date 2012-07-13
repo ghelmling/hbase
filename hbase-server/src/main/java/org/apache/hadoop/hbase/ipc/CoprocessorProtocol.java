@@ -39,6 +39,7 @@ import org.apache.hadoop.classification.InterfaceStability;
  */
 @InterfaceAudience.Public
 @InterfaceStability.Evolving
+@Deprecated
 public interface CoprocessorProtocol extends VersionedProtocol {
   public static final long VERSION = 1L;
 }

@@ -5,7 +5,15 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.HConnection;
+import org.apache.hadoop.hbase.client.ServerCallable;
+import org.apache.hadoop.hbase.client.coprocessor.Exec;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
+import org.apache.hadoop.hbase.util.Bytes;
+
+import java.io.IOException;
+
+import static org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceResponse;
 
 /**
  */
@@ -34,30 +42,53 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
       LOG.debug("Call: "+method.getName()+", "+request.toString());
     }
 
-    if (row != null) {
-      final Exec exec = new Exec(conf, row, protocol, method, args);
-      ServerCallable<ExecResult> callable =
-          new ServerCallable<ExecResult>(connection, table, row) {
-            public ExecResult call() throws Exception {
-              byte[] regionName = location.getRegionInfo().getRegionName();
-              return ProtobufUtil.execCoprocessor(server, exec, regionName);
-            }
-          };
-      ExecResult result = callable.withRetries();
-      this.regionName = result.getRegionName();
-      LOG.debug("Result is region="+ Bytes.toStringBinary(regionName) +
-          ", value="+result.getValue());
-      return result.getValue();
+    if (row == null) {
+      throw new IllegalArgumentException("Missing row property for remote region location");
     }
 
-    return null;
+    final ClientProtos.CoprocessorServiceCall call =
+        ClientProtos.CoprocessorServiceCall.newBuilder()
+            .setRow(ByteString.copyFrom(row))
+            .setServiceName(method.getService().getFullName())
+            .setMethodName(method.getName())
+            .setRequest(request.toByteString()).build();
+    ServerCallable<ClientProtos.CoprocessorServiceResponse> callable =
+        new ServerCallable<ClientProtos.CoprocessorServiceResponse>(connection, table, row) {
+          public CoprocessorServiceResponse call() throws Exception {
+            byte[] regionName = location.getRegionInfo().getRegionName();
+            return ProtobufUtil.execService(server, call, regionName);
+          }
+        };
+    Message response = null;
+    try {
+      CoprocessorServiceResponse result = callable.withRetries();
+      response = responsePrototype.newBuilderForType().mergeFrom(result.getValue()).build();
+      LOG.debug("Result is region="+ Bytes.toStringBinary(
+          result.getRegion().getValue().toByteArray()) + ", value="+response);
+    } catch (IOException ioe) {
+      if (controller != null) {
+        controller.setFailed(ioe.getMessage());
+      }
+    }
+    if (callback != null) {
+      callback.run(response);
+    }
   }
 
   @Override
   public Message callBlockingMethod(Descriptors.MethodDescriptor method,
-                                    RpcController rpcController,
+                                    RpcController controller,
                                     Message request, Message responsePrototype)
       throws ServiceException {
-    return null;
+    final Message.Builder responseBuilder = responsePrototype.newBuilderForType();
+    callMethod(method, controller, request, responsePrototype,
+        new RpcCallback<Message>() {
+          @Override
+          public void run(Message message) {
+            responseBuilder.mergeFrom(message);
+          }
+        });
+
+    return responseBuilder.build();
   }
 }

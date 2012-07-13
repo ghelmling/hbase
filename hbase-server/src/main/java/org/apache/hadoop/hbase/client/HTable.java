@@ -1353,7 +1353,7 @@ public class HTable implements HTableInterface {
 
   public CoprocessorRpcChannel coprocessorService(byte[] row)
       throws Exception {
-    return new CoprocessorRpcChannel(row);
+    return new CoprocessorRpcChannel(configuration, connection, tableName, row);
   }
 
   /**
