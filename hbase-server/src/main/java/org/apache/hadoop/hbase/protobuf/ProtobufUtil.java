@@ -93,6 +93,9 @@ import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.BulkLoadHFileRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.BulkLoadHFileResponse;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.Column;
+import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceCall;
+import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceRequest;
+import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceResponse;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ExecCoprocessorRequest;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.ExecCoprocessorResponse;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos.GetRequest;
@@ -128,6 +131,8 @@ import com.google.common.collect.ListMultimap;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import com.google.protobuf.ServiceException;
+
+import static org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.RegionSpecifier.RegionSpecifierType.*;
 
 /**
  * Protobufs utility.
@@ -1301,6 +1306,20 @@ public final class ProtobufUtil {
         client.execCoprocessor(null, request);
       Object value = ProtobufUtil.toObject(response.getValue());
       return new ExecResult(regionName, value);
+    } catch (ServiceException se) {
+      throw getRemoteException(se);
+    }
+  }
+
+  public static CoprocessorServiceResponse execService(final ClientProtocol client,
+      final CoprocessorServiceCall call, final byte[] regionName) throws IOException {
+    CoprocessorServiceRequest request = CoprocessorServiceRequest.newBuilder()
+        .setCall(call).setRegion(
+            RequestConverter.buildRegionSpecifier(REGION_NAME, regionName)).build();
+    try {
+      CoprocessorServiceResponse response =
+          client.execService(null, request);
+      return response;
     } catch (ServiceException se) {
       throw getRemoteException(se);
     }
