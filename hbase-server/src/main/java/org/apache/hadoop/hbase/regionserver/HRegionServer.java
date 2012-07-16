@@ -53,6 +53,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import javax.management.ObjectName;
 
+import com.google.protobuf.Message;
 import org.apache.commons.lang.mutable.MutableDouble;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -116,6 +117,7 @@ import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.ipc.ServerNotRunningYetException;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
@@ -3212,8 +3214,19 @@ public class  HRegionServer implements ClientProtocol,
   @Override
   public CoprocessorServiceResponse execService(final RpcController controller,
       final CoprocessorServiceRequest request) throws ServiceException {
-    // FIXME: needs similar implementation to execCoprocessor
-    return null;
+    try {
+      requestCount.incrementAndGet();
+      HRegion region = getRegion(request.getRegion());
+      CoprocessorServiceResponse.Builder builder =
+          CoprocessorServiceResponse.newBuilder();
+      Message result = region.execService(controller, request.getCall());
+      builder.setRegion(RequestConverter.buildRegionSpecifier(
+          RegionSpecifierType.REGION_NAME, region.getRegionName()));
+      builder.setValue(ProtobufUtil.toParameter(result));
+      return builder.build();
+    } catch (IOException ie) {
+      throw new ServiceException(ie);
+    }
   }
 
   /**

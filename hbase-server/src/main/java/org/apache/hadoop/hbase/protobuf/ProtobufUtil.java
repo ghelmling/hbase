@@ -36,6 +36,7 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DeserializationException;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -67,6 +68,7 @@ import org.apache.hadoop.hbase.filter.Filter;
 import org.apache.hadoop.hbase.io.HbaseObjectWritable;
 import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetOnlineRegionRequest;
@@ -114,6 +116,8 @@ import org.apache.hadoop.hbase.protobuf.generated.MasterMonitorProtos.GetTableDe
 import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
+import org.apache.hadoop.hbase.security.access.Permission;
+import org.apache.hadoop.hbase.security.access.UserPermission;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
 
@@ -1501,5 +1505,39 @@ public final class ProtobufUtil {
     m.writeDelimitedTo(baos);
     baos.close();
     return ProtobufUtil.prependPBMagic(baos.toByteArray());
+  }
+
+  public static UserPermission toUserPermission(AccessControlProtos.UserPermission proto) {
+    List<Permission.Action> actions = toPermissionActions(proto.getPermission().getActionList());
+
+    return new UserPermission(proto.getUser().toByteArray(),
+        proto.getPermission().getTable().toByteArray(),
+        proto.getPermission().getFamily().toByteArray(),
+        proto.getPermission().getQualifier().toByteArray(),
+        actions.toArray(new Permission.Action[actions.size()]));
+  }
+
+  public static List<Permission.Action> toPermissionActions(List<AccessControlProtos.Permission.Action> protoActions) {
+    List<Permission.Action> actions = Lists.newArrayListWithCapacity(protoActions.size());
+    for (AccessControlProtos.Permission.Action a : protoActions) {
+      switch (a) {
+        case READ:
+          actions.add(Permission.Action.READ);
+          break;
+        case WRITE:
+          actions.add(Permission.Action.WRITE);
+          break;
+        case EXEC:
+          actions.add(Permission.Action.EXEC);
+          break;
+        case CREATE:
+          actions.add(Permission.Action.CREATE);
+          break;
+        case ADMIN:
+          actions.add(Permission.Action.ADMIN);
+          break;
+      }
+    }
+    return actions;
   }
 }

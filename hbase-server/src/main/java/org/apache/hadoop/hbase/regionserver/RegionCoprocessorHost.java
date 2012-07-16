@@ -21,6 +21,7 @@
 package org.apache.hadoop.hbase.regionserver;
 
 import com.google.common.collect.ImmutableList;
+import com.google.protobuf.Service;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
@@ -191,7 +192,11 @@ public class RegionCoprocessorHost
     for (Class c : implClass.getInterfaces()) {
       if (CoprocessorProtocol.class.isAssignableFrom(c)) {
         region.registerProtocol(c, (CoprocessorProtocol)instance);
-        break;
+      }
+      // we allow endpoints to register as both CoproocessorProtocols and Services
+      // for ease of transition
+      if (CoprocessorService.class.isAssignableFrom(c)) {
+        region.registerService( ((CoprocessorService)instance).getService() );
       }
     }
     return new RegionEnvironment(instance, priority, seq, conf, region,
