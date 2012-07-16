@@ -62,7 +62,8 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
     Message response = null;
     try {
       CoprocessorServiceResponse result = callable.withRetries();
-      response = responsePrototype.newBuilderForType().mergeFrom(result.getValue()).build();
+      response = responsePrototype.newBuilderForType()
+          .mergeFrom(result.getValue().getValue()).build();
       LOG.debug("Result is region="+ Bytes.toStringBinary(
           result.getRegion().getValue().toByteArray()) + ", value="+response);
     } catch (IOException ioe) {
@@ -85,7 +86,9 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
         new RpcCallback<Message>() {
           @Override
           public void run(Message message) {
-            responseBuilder.mergeFrom(message);
+            if (message != null) {
+              responseBuilder.mergeFrom(message);
+            }
           }
         });
 

@@ -24,6 +24,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import com.google.protobuf.RpcCallback;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.Service;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -40,18 +43,15 @@ import org.apache.hadoop.hbase.client.Increment;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.client.Scan;
-import org.apache.hadoop.hbase.coprocessor.BaseRegionObserver;
-import org.apache.hadoop.hbase.coprocessor.CoprocessorException;
-import org.apache.hadoop.hbase.coprocessor.MasterCoprocessorEnvironment;
-import org.apache.hadoop.hbase.coprocessor.MasterObserver;
-import org.apache.hadoop.hbase.coprocessor.ObserverContext;
-import org.apache.hadoop.hbase.coprocessor.RegionCoprocessorEnvironment;
+import org.apache.hadoop.hbase.coprocessor.*;
 import org.apache.hadoop.hbase.filter.CompareFilter;
 import org.apache.hadoop.hbase.filter.FilterList;
 import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RequestContext;
+import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
 import org.apache.hadoop.hbase.regionserver.RegionScanner;
@@ -68,6 +68,8 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+
+import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.AccessControlService;
 
 /**
  * Provides basic authorization checks for data access and administrative
@@ -101,7 +103,8 @@ import com.google.common.collect.Sets;
  * </p>
  */
 public class AccessController extends BaseRegionObserver
-    implements MasterObserver, AccessControllerProtocol {
+    implements MasterObserver, AccessControllerProtocol,
+    AccessControlService.Interface, CoprocessorService {
   /**
    * Represents the result of an authorization check for logging and error
    * reporting.
@@ -1049,6 +1052,7 @@ public class AccessController extends BaseRegionObserver
    * These methods are only allowed to be called against the _acl_ region(s).
    * This will be restricted by both client side and endpoint implementations.
    */
+  @Deprecated
   @Override
   public void grant(UserPermission perm) throws IOException {
     // verify it's only running at .acl.
@@ -1079,6 +1083,7 @@ public class AccessController extends BaseRegionObserver
             permission.getActions()));
   }
 
+  @Deprecated
   @Override
   public void revoke(UserPermission perm) throws IOException {
     // only allowed to be called on _acl_ region
@@ -1109,6 +1114,7 @@ public class AccessController extends BaseRegionObserver
             permission.getActions()));
   }
 
+  @Deprecated
   @Override
   public List<UserPermission> getUserPermissions(final byte[] tableName) throws IOException {
     // only allowed to be called on _acl_ region
@@ -1124,6 +1130,7 @@ public class AccessController extends BaseRegionObserver
     }
   }
 
+  @Deprecated
   @Override
   public void checkPermissions(Permission[] permissions) throws IOException {
     byte[] tableName = regionEnv.getRegion().getTableDesc().getName();
@@ -1158,11 +1165,13 @@ public class AccessController extends BaseRegionObserver
     }
   }
 
+  @Deprecated
   @Override
   public long getProtocolVersion(String protocol, long clientVersion) throws IOException {
     return PROTOCOL_VERSION;
   }
 
+  @Deprecated
   @Override
   public ProtocolSignature getProtocolSignature(String protocol,
       long clientVersion, int clientMethodsHash) throws IOException {
@@ -1172,6 +1181,48 @@ public class AccessController extends BaseRegionObserver
     throw new HBaseRPC.UnknownProtocolException(
         "Unexpected protocol requested: "+protocol);
   }
+
+
+  /* ---- Protobuf AccessControlService implementation ---- */
+  @Override
+  public void grant(RpcController controller,
+                    AccessControlProtos.GrantRequest request,
+                    RpcCallback<AccessControlProtos.GrantResponse> done) {
+    UserPermission perm = ProtobufUtil.toUserPermission(request.getPermission());
+    try {
+      grant(perm);
+      done.run(AccessControlProtos.GrantResponse.getDefaultInstance());
+    } catch (IOException ioe) {
+      // TODO: how do we pass back exceptions???
+    }
+  }
+
+  @Override
+  public void revoke(RpcController controller,
+                     AccessControlProtos.RevokeRequest request,
+                     RpcCallback<AccessControlProtos.RevokeResponse> done) {
+    //To change body of implemented methods use File | Settings | File Templates.
+  }
+
+  @Override
+  public void getUserPermissions(RpcController controller,
+                                 AccessControlProtos.UserPermissionsRequest request,
+                                 RpcCallback<AccessControlProtos.UserPermissionsResponse> done) {
+    //To change body of implemented methods use File | Settings | File Templates.
+  }
+
+  @Override
+  public void checkPermissions(RpcController controller,
+                               AccessControlProtos.CheckPermissionsRequest request,
+                               RpcCallback<AccessControlProtos.CheckPermissionsResponse> done) {
+    //To change body of implemented methods use File | Settings | File Templates.
+  }
+
+  @Override
+  public Service getService() {
+    return AccessControlProtos.AccessControlService.newReflectiveService(this);
+  }
+
 
   private byte[] getTableName(RegionCoprocessorEnvironment e) {
     HRegion region = e.getRegion();

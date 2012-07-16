@@ -38,6 +38,7 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DeserializationException;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -70,6 +71,7 @@ import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.io.HbaseObjectWritable;
 import org.apache.hadoop.hbase.io.TimeRange;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionRequest;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetOnlineRegionRequest;
@@ -1628,7 +1630,7 @@ public final class ProtobufUtil {
   /**
    * Convert a client Permission to a Permission proto
    *
-   * @param action the client Permission
+   * @param perm the client Permission
    * @return the protobuf Permission
    */
   public static AccessControlProtos.Permission toPermission(Permission perm) {
@@ -1669,7 +1671,7 @@ public final class ProtobufUtil {
   /**
    * Converts a Permission.Action proto to a client Permission.Action object.
    *
-   * @param proto the protobuf Action
+   * @param action the protobuf Action
    * @return the converted Action
    */
   public static Permission.Action toPermissionAction(

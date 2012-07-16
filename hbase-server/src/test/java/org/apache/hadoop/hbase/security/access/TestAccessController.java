@@ -18,6 +18,8 @@
 
 package org.apache.hadoop.hbase.security.access;
 
+import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.AccessControlService;
+import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.CheckPermissionsRequest;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
@@ -133,8 +135,8 @@ public class TestAccessController {
     // initilize access control
     HTable meta = new HTable(conf, AccessControlLists.ACL_TABLE_NAME);
     BlockingRpcChannel service = meta.coprocessorService(TEST_TABLE);
-    AccessControlProtos.AccessControlService.BlockingInterface protocol =
-        AccessControlProtos.AccessControlService.newBlockingStub(service);
+    AccessControlService.BlockingInterface protocol =
+        AccessControlService.newBlockingStub(service);
 
     HRegion region = TEST_UTIL.getHBaseCluster().getRegions(TEST_TABLE).get(0);
     RegionCoprocessorHost rcpHost = region.getCoprocessorHost();
@@ -1151,17 +1153,24 @@ public class TestAccessController {
     verifyDenied(action, USER_CREATE, USER_RW, USER_NONE, USER_RO);
   }
 
-  public void checkGlobalPerms(Permission.Action... actions) throws IOException {
+  public void checkGlobalPerms(Permission.Action... actions) throws Exception {
     HTable acl = new HTable(conf, AccessControlLists.ACL_TABLE_NAME);
-    AccessControllerProtocol protocol = acl.coprocessorProxy(AccessControllerProtocol.class,
-      new byte[0]);
+    BlockingRpcChannel channel = acl.coprocessorService(new byte[0]);
+    AccessControlService.BlockingInterface protocol =
+        AccessControlService.newBlockingStub(channel);
 
     Permission[] perms = new Permission[actions.length];
     for (int i = 0; i < actions.length; i++) {
       perms[i] = new Permission(actions[i]);
     }
 
-    protocol.checkPermissions(perms);
+    /* FIXME
+    CheckPermissionsRequest.Builder request = CheckPermissionsRequest.newBuilder();
+    for (Action a : actions) {
+      request.addPermission(AccessControlProtos.Permission.newBuilder().addAction(a).build());
+    }
+    protocol.checkPermissions(null, request.build());
+    */
   }
 
   public void checkTablePerms(byte[] table, byte[] family, byte[] column,

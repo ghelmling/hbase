@@ -310,7 +310,7 @@ message CoprocessorServiceRequest {
 
 message CoprocessorServiceResponse {
   required RegionSpecifier region = 1;
-  required bytes value = 2;
+  required NameBytesPair value = 2;
 }
 
 /**
