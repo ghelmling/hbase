@@ -38,6 +38,34 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
                          RpcController controller,
                          Message request, Message responsePrototype,
                          RpcCallback<Message> callback) {
+    Message response = null;
+    try {
+      response = callExecService(method, request, response);
+    } catch (IOException ioe) {
+      if (controller != null) {
+        controller.setFailed(ioe.getMessage());
+      }
+    }
+    if (callback != null) {
+      callback.run(response);
+    }
+  }
+
+  @Override
+  public Message callBlockingMethod(Descriptors.MethodDescriptor method,
+                                    RpcController controller,
+                                    Message request, Message responsePrototype)
+      throws ServiceException {
+    try {
+      return callExecService(method, request, responsePrototype);
+    } catch (IOException ioe) {
+      throw new ServiceException("Error calling method "+method.getFullName(), ioe);
+    }
+  }
+
+  private Message callExecService(Descriptors.MethodDescriptor method,
+                                  Message request, Message responsePrototype)
+      throws IOException {
     if (LOG.isDebugEnabled()) {
       LOG.debug("Call: "+method.getName()+", "+request.toString());
     }
@@ -59,39 +87,17 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
             return ProtobufUtil.execService(server, call, regionName);
           }
         };
+    CoprocessorServiceResponse result = callable.withRetries();
     Message response = null;
-    try {
-      CoprocessorServiceResponse result = callable.withRetries();
+    if (result.getValue().hasValue()) {
+      LOG.debug("Result is "+result+", result value is "+result.getValue());
       response = responsePrototype.newBuilderForType()
           .mergeFrom(result.getValue().getValue()).build();
-      LOG.debug("Result is region="+ Bytes.toStringBinary(
-          result.getRegion().getValue().toByteArray()) + ", value="+response);
-    } catch (IOException ioe) {
-      if (controller != null) {
-        controller.setFailed(ioe.getMessage());
-      }
+    } else {
+      response = responsePrototype.getDefaultInstanceForType();
     }
-    if (callback != null) {
-      callback.run(response);
-    }
-  }
-
-  @Override
-  public Message callBlockingMethod(Descriptors.MethodDescriptor method,
-                                    RpcController controller,
-                                    Message request, Message responsePrototype)
-      throws ServiceException {
-    final Message.Builder responseBuilder = responsePrototype.newBuilderForType();
-    callMethod(method, controller, request, responsePrototype,
-        new RpcCallback<Message>() {
-          @Override
-          public void run(Message message) {
-            if (message != null) {
-              responseBuilder.mergeFrom(message);
-            }
-          }
-        });
-
-    return responseBuilder.build();
+    LOG.debug("Result is region="+ Bytes.toStringBinary(
+        result.getRegion().getValue().toByteArray()) + ", value="+response);
+    return response;
   }
 }

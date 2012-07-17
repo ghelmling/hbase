@@ -49,7 +49,9 @@ import org.apache.hadoop.hbase.filter.WritableByteArrayComparable;
 import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RequestContext;
+import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.regionserver.HRegion;
 import org.apache.hadoop.hbase.regionserver.InternalScanner;
@@ -67,6 +69,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.AccessControlService;
 
@@ -1178,33 +1181,65 @@ public class AccessController extends BaseRegionObserver
                     AccessControlProtos.GrantRequest request,
                     RpcCallback<AccessControlProtos.GrantResponse> done) {
     UserPermission perm = ProtobufUtil.toUserPermission(request.getPermission());
+    AccessControlProtos.GrantResponse response = null;
     try {
       grant(perm);
-      done.run(AccessControlProtos.GrantResponse.getDefaultInstance());
+      response = AccessControlProtos.GrantResponse.getDefaultInstance();
     } catch (IOException ioe) {
-      // TODO: how do we pass back exceptions???
+      // pass exception back up
+      setControllerException(controller, ioe);
     }
+    done.run(response);
   }
 
   @Override
   public void revoke(RpcController controller,
                      AccessControlProtos.RevokeRequest request,
                      RpcCallback<AccessControlProtos.RevokeResponse> done) {
-    //To change body of implemented methods use File | Settings | File Templates.
+    UserPermission perm = ProtobufUtil.toUserPermission(request.getPermission());
+    AccessControlProtos.RevokeResponse response = null;
+    try {
+      revoke(perm);
+      response = AccessControlProtos.RevokeResponse.getDefaultInstance();
+    } catch (IOException ioe) {
+      // pass exception back up
+      setControllerException(controller, ioe);
+    }
+    done.run(response);
   }
 
   @Override
   public void getUserPermissions(RpcController controller,
                                  AccessControlProtos.UserPermissionsRequest request,
                                  RpcCallback<AccessControlProtos.UserPermissionsResponse> done) {
-    //To change body of implemented methods use File | Settings | File Templates.
+    byte[] table = request.getTable().toByteArray();
+    AccessControlProtos.UserPermissionsResponse response = null;
+    try {
+      List<UserPermission> perms = getUserPermissions(table);
+      response = ResponseConverter.buildUserPermissionsResponse(perms);
+    } catch (IOException ioe) {
+      // pass exception back up
+      setControllerException(controller, ioe);
+    }
+    done.run(response);
   }
 
   @Override
   public void checkPermissions(RpcController controller,
                                AccessControlProtos.CheckPermissionsRequest request,
                                RpcCallback<AccessControlProtos.CheckPermissionsResponse> done) {
-    //To change body of implemented methods use File | Settings | File Templates.
+    Permission[] perms = new Permission[request.getPermissionCount()];
+    for (int i=0; i < request.getPermissionCount(); i++) {
+      perms[i] = ProtobufUtil.toPermission(request.getPermission(i));
+    }
+    AccessControlProtos.CheckPermissionsResponse response = null;
+    try {
+      checkPermissions(perms);
+      response = AccessControlProtos.CheckPermissionsResponse.getDefaultInstance();
+    } catch (IOException ioe) {
+      setControllerException(controller, ioe);
+    }
+    done.run(response);
   }
 
   @Override
@@ -1212,6 +1247,15 @@ public class AccessController extends BaseRegionObserver
     return AccessControlProtos.AccessControlService.newReflectiveService(this);
   }
 
+  private void setControllerException(RpcController controller, IOException ioe) {
+    if (controller != null) {
+      if (controller instanceof ServerRpcController) {
+        ((ServerRpcController)controller).setFailedOn(ioe);
+      } else {
+        controller.setFailed(StringUtils.stringifyException(ioe));
+      }
+    }
+  }
 
   private byte[] getTableName(RegionCoprocessorEnvironment e) {
     HRegion region = e.getRegion();

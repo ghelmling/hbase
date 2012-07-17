@@ -117,6 +117,7 @@ import org.apache.hadoop.hbase.regionserver.wal.HLog;
 import org.apache.hadoop.hbase.regionserver.wal.HLogKey;
 import org.apache.hadoop.hbase.regionserver.wal.WALEdit;
 import org.apache.hadoop.hbase.security.access.Permission;
+import org.apache.hadoop.hbase.security.access.TablePermission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.Pair;
@@ -1507,6 +1508,11 @@ public final class ProtobufUtil {
     return ProtobufUtil.prependPBMagic(baos.toByteArray());
   }
 
+  /**
+   * Converts a user permission proto to a client user permission object.
+   * @param proto
+   * @return
+   */
   public static UserPermission toUserPermission(AccessControlProtos.UserPermission proto) {
     List<Permission.Action> actions = toPermissionActions(proto.getPermission().getActionList());
 
@@ -1517,27 +1523,123 @@ public final class ProtobufUtil {
         actions.toArray(new Permission.Action[actions.size()]));
   }
 
-  public static List<Permission.Action> toPermissionActions(List<AccessControlProtos.Permission.Action> protoActions) {
-    List<Permission.Action> actions = Lists.newArrayListWithCapacity(protoActions.size());
-    for (AccessControlProtos.Permission.Action a : protoActions) {
-      switch (a) {
-        case READ:
-          actions.add(Permission.Action.READ);
-          break;
-        case WRITE:
-          actions.add(Permission.Action.WRITE);
-          break;
-        case EXEC:
-          actions.add(Permission.Action.EXEC);
-          break;
-        case CREATE:
-          actions.add(Permission.Action.CREATE);
-          break;
-        case ADMIN:
-          actions.add(Permission.Action.ADMIN);
-          break;
+  /**
+   * Convert a client user permission to a user permission proto
+   * @param perm
+   * @return
+   */
+  public static AccessControlProtos.UserPermission toUserPermission(UserPermission perm) {
+    AccessControlProtos.Permission.Builder permissionBuilder =
+        AccessControlProtos.Permission.newBuilder();
+    for (Permission.Action a : perm.getActions()) {
+      permissionBuilder.addAction(
+          AccessControlProtos.Permission.Action.valueOf(a.name()));
+    }
+    if (perm.getTable() != null) {
+      permissionBuilder.setTable(ByteString.copyFrom(perm.getTable()));
+    }
+    if (perm.getFamily() != null) {
+      permissionBuilder.setFamily(ByteString.copyFrom(perm.getFamily()));
+    }
+    if (perm.getQualifier() != null) {
+      permissionBuilder.setQualifier(ByteString.copyFrom(perm.getQualifier()));
+    }
+
+    return AccessControlProtos.UserPermission.newBuilder()
+        .setUser(ByteString.copyFrom(perm.getUser()))
+        .setPermission(permissionBuilder)
+        .build();
+  }
+
+  public static Permission toPermission(AccessControlProtos.Permission proto) {
+    List<Permission.Action> actions = toPermissionActions(proto.getActionList());
+    if (proto.hasTable()) {
+      return new TablePermission(proto.getTable().toByteArray(),
+          proto.getFamily().toByteArray(),
+          proto.getQualifier().toByteArray(),
+          actions.toArray(new Permission.Action[actions.size()]));
+    } else {
+      return new Permission(actions.toArray(new Permission.Action[actions.size()]));
+    }
+  }
+
+  public static AccessControlProtos.Permission toPermission(Permission perm) {
+    AccessControlProtos.Permission.Builder builder = AccessControlProtos.Permission.newBuilder();
+    if (perm instanceof TablePermission) {
+      TablePermission tablePerm = (TablePermission)perm;
+      if (tablePerm.getTable() != null) {
+        builder.setTable(ByteString.copyFrom(tablePerm.getTable()));
+      }
+      if (tablePerm.getFamily() != null) {
+        builder.setFamily(ByteString.copyFrom(tablePerm.getFamily()));
+      }
+      if (tablePerm.getQualifier() != null) {
+        builder.setQualifier(ByteString.copyFrom(tablePerm.getQualifier()));
       }
     }
+    for (Permission.Action a : perm.getActions()) {
+      builder.addAction(toPermissionAction(a));
+    }
+    return builder.build();
+  }
+
+  public static List<Permission.Action> toPermissionActions(
+      List<AccessControlProtos.Permission.Action> protoActions) {
+    List<Permission.Action> actions = Lists.newArrayListWithCapacity(protoActions.size());
+    for (AccessControlProtos.Permission.Action a : protoActions) {
+      actions.add(toPermissionAction(a));
+    }
     return actions;
+  }
+
+  public static Permission.Action toPermissionAction(
+      AccessControlProtos.Permission.Action action) {
+    switch (action) {
+      case READ:
+        return Permission.Action.READ;
+      case WRITE:
+        return Permission.Action.WRITE;
+      case EXEC:
+        return Permission.Action.EXEC;
+      case CREATE:
+        return Permission.Action.CREATE;
+      case ADMIN:
+        return Permission.Action.ADMIN;
+    }
+    throw new IllegalArgumentException("Unknown action value "+action.name());
+  }
+
+  public static AccessControlProtos.Permission.Action toPermissionAction(
+      Permission.Action action) {
+    switch (action) {
+      case READ:
+        return AccessControlProtos.Permission.Action.READ;
+      case WRITE:
+        return AccessControlProtos.Permission.Action.WRITE;
+      case EXEC:
+        return AccessControlProtos.Permission.Action.EXEC;
+      case CREATE:
+        return AccessControlProtos.Permission.Action.CREATE;
+      case ADMIN:
+        return AccessControlProtos.Permission.Action.ADMIN;
+    }
+    throw new IllegalArgumentException("Unknown action value "+action.name());
+  }
+
+  /**
+   * Unwraps an exception from a protobuf service into the underlying (expected) IOException.
+   * @param se
+   * @return
+   */
+  public static void toIOException(ServiceException se) throws IOException {
+    if (se == null) {
+      throw new NullPointerException("Null service exception passed!");
+    }
+
+    Throwable cause = se.getCause();
+    if (cause != null && cause instanceof IOException) {
+      throw (IOException)cause;
+    }
+    throw new IOException(se);
   }
 }
