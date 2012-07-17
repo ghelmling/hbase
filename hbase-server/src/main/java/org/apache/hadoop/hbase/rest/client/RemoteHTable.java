@@ -34,6 +34,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.util.StringUtils;
 
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -730,6 +731,11 @@ public class RemoteHTable implements HTableInterface {
       Batch.Call<T, R> callable, Batch.Callback<R> callback)
       throws IOException, Throwable {
     throw new UnsupportedOperationException("coprocessorExec not implemented");
+  }
+
+  @Override
+  public CoprocessorRpcChannel coprocessorService(byte[] row) {
+    throw new UnsupportedOperationException("coprocessorService not implemented");
   }
 
   @Override

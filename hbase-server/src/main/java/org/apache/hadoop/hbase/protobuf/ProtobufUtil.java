@@ -1810,4 +1810,21 @@ public final class ProtobufUtil {
 
     return perms;
   }
+
+  /**
+   * Unwraps an exception from a protobuf service into the underlying (expected) IOException.
+   * @param se
+   * @return
+   */
+  public static void toIOException(ServiceException se) throws IOException {
+    if (se == null) {
+      throw new NullPointerException("Null service exception passed!");
+    }
+
+    Throwable cause = se.getCause();
+    if (cause != null && cause instanceof IOException) {
+      throw (IOException)cause;
+    }
+    throw new IOException(se);
+  }
 }

@@ -25,6 +25,7 @@ import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetOnlineRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetServerInfoResponse;
@@ -40,9 +41,12 @@ import org.apache.hadoop.hbase.protobuf.generated.MasterAdminProtos.CatalogScanR
 import org.apache.hadoop.hbase.protobuf.generated.MasterAdminProtos.EnableCatalogJanitorResponse;
 import org.apache.hadoop.hbase.protobuf.generated.RegionServerStatusProtos.GetLastFlushedSequenceIdResponse;
 import org.apache.hadoop.hbase.regionserver.RegionOpeningState;
+import org.apache.hadoop.hbase.security.access.UserPermission;
 import org.apache.hadoop.util.StringUtils;
 
 import com.google.protobuf.ByteString;
+
+import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.UserPermissionsResponse;
 
 /**
  * Helper utility to build protocol buffer responses,
@@ -114,6 +118,18 @@ public final class ResponseConverter {
     parameterBuilder.setValue(
       ByteString.copyFromUtf8(StringUtils.stringifyException(t)));
     builder.setException(parameterBuilder.build());
+    return builder.build();
+  }
+
+  /**
+   *
+   */
+  public static UserPermissionsResponse buildUserPermissionsResponse(
+      final List<UserPermission> permissions) {
+    UserPermissionsResponse.Builder builder = UserPermissionsResponse.newBuilder();
+    for (UserPermission perm : permissions) {
+      builder.addPermission(ProtobufUtil.toUserPermission(perm));
+    }
     return builder.build();
   }
 

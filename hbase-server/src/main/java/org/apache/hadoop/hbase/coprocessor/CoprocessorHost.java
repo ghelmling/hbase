@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.HTableDescriptor;
 import org.apache.hadoop.hbase.client.*;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.CoprocessorProtocol;
+import org.apache.hadoop.hbase.ipc.CoprocessorRpcChannel;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hbase.util.SortedCopyOnWriteSet;
 import org.apache.hadoop.hbase.util.VersionInfo;
@@ -534,6 +535,11 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       public <T extends CoprocessorProtocol> T coprocessorProxy(Class<T> protocol,
           byte[] row) {
         return table.coprocessorProxy(protocol, row);
+      }
+
+      @Override
+      public CoprocessorRpcChannel coprocessorService(byte[] row) {
+        return table.coprocessorService(row);
       }
 
       @Override

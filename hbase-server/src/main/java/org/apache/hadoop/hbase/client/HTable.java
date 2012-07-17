@@ -1332,8 +1332,7 @@ public class HTable implements HTableInterface {
             row));
   }
 
-  public CoprocessorRpcChannel coprocessorService(byte[] row)
-      throws Exception {
+  public CoprocessorRpcChannel coprocessorService(byte[] row) {
     return new CoprocessorRpcChannel(configuration, connection, tableName, row);
   }
 
@@ -1341,6 +1340,7 @@ public class HTable implements HTableInterface {
    * {@inheritDoc}
    */
   @Override
+  @Deprecated
   public <T extends CoprocessorProtocol, R> Map<byte[],R> coprocessorExec(
       Class<T> protocol, byte[] startKey, byte[] endKey,
       Batch.Call<T,R> callable)
@@ -1361,6 +1361,7 @@ public class HTable implements HTableInterface {
    * {@inheritDoc}
    */
   @Override
+  @Deprecated
   public <T extends CoprocessorProtocol, R> void coprocessorExec(
       Class<T> protocol, byte[] startKey, byte[] endKey,
       Batch.Call<T,R> callable, Batch.Callback<R> callback)

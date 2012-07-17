@@ -116,6 +116,7 @@ import org.apache.hadoop.hbase.ipc.HBaseRpcMetrics;
 import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RpcServer;
 import org.apache.hadoop.hbase.ipc.ServerNotRunningYetException;
+import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.ResponseConverter;
@@ -3343,12 +3344,19 @@ public class  HRegionServer implements ClientProtocol,
     try {
       requestCount.incrementAndGet();
       HRegion region = getRegion(request.getRegion());
+      // ignore the passed in controller (from the serialized call)
+      ServerRpcController execController = new ServerRpcController();
+      Message result = region.execService(execController, request.getCall());
+      if (execController.getFailedOn() != null) {
+        throw execController.getFailedOn();
+      }
       CoprocessorServiceResponse.Builder builder =
           CoprocessorServiceResponse.newBuilder();
-      Message result = region.execService(controller, request.getCall());
       builder.setRegion(RequestConverter.buildRegionSpecifier(
           RegionSpecifierType.REGION_NAME, region.getRegionName()));
-      builder.setValue(ProtobufUtil.toParameter(result));
+      builder.setValue(
+          builder.getValueBuilder().setName(result.getClass().getName())
+              .setValue(result.toByteString()));
       return builder.build();
     } catch (IOException ie) {
       throw new ServiceException(ie);
