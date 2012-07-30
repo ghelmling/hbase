@@ -32,11 +32,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google.protobuf.Service;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -1371,6 +1376,47 @@ public class HTable implements HTableInterface {
     List<byte[]> keys = getStartKeysInRange(startKey, endKey);
     connection.processExecs(protocol, keys, tableName, pool, callable,
         callback);
+  }
+
+  public <T extends Service, R> void coprocessorService(final Class<T> service,
+      byte[] startKey, byte[] endKey, final Batch.Call<T,R> callable,
+      final Batch.Callback<R> callback) throws ServiceException, Throwable {
+
+    // get regions covered by the row range
+    List<byte[]> keys = getStartKeysInRange(startKey, endKey);
+
+    Map<byte[],Future<R>> futures =
+        new TreeMap<byte[],Future<R>>(Bytes.BYTES_COMPARATOR);
+    for (final byte[] r : keys) {
+      final CoprocessorRpcChannel channel =
+          new CoprocessorRpcChannel(configuration, connection, tableName, r);
+      Future<R> future = pool.submit(
+          new Callable<R>() {
+            public R call() throws Exception {
+              T instance = ProtobufUtil.newServiceStub(service, channel);
+              R result = callable.call(instance);
+              byte[] region = channel.getLastRegion();
+              if (callback != null) {
+                callback.update(region, r, result);
+              }
+              return result;
+            }
+          });
+      futures.put(r, future);
+    }
+    for (Map.Entry<byte[],Future<R>> e : futures.entrySet()) {
+      try {
+        e.getValue().get();
+      } catch (ExecutionException ee) {
+        LOG.warn("Error calling coprocessor service " + service.getName() + " for row "
+            + Bytes.toStringBinary(e.getKey()), ee);
+        throw ee.getCause();
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        throw new IOException("Interrupted calling coprocessor service " + service.getName()
+            + " for row " + Bytes.toStringBinary(e.getKey()), ie);
+      }
+    }
   }
 
   private List<byte[]> getStartKeysInRange(byte[] start, byte[] end)

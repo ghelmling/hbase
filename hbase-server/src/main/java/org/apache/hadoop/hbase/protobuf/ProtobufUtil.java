@@ -38,7 +38,6 @@ import java.util.NavigableMap;
 import java.util.NavigableSet;
 import java.util.TreeMap;
 
-import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.DeserializationException;
 import org.apache.hadoop.hbase.DoNotRetryIOException;
@@ -125,6 +124,7 @@ import org.apache.hadoop.hbase.security.access.Permission;
 import org.apache.hadoop.hbase.security.access.TablePermission;
 import org.apache.hadoop.hbase.security.access.UserPermission;
 import org.apache.hadoop.hbase.util.Bytes;
+import org.apache.hadoop.hbase.util.Methods;
 import org.apache.hadoop.hbase.util.Pair;
 
 import com.google.common.collect.ArrayListMultimap;
@@ -132,6 +132,8 @@ import com.google.common.collect.ListMultimap;
 
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
+import com.google.protobuf.RpcChannel;
+import com.google.protobuf.Service;
 import com.google.protobuf.ServiceException;
 
 import static org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.RegionSpecifier.RegionSpecifierType.*;
@@ -1325,6 +1327,12 @@ public final class ProtobufUtil {
     } catch (ServiceException se) {
       throw getRemoteException(se);
     }
+  }
+
+  public static <T extends Service> T newServiceStub(Class<T> service, RpcChannel channel)
+      throws Exception {
+    return (T)Methods.call(service, null, "newStub",
+        new Class[]{ RpcChannel.class }, new Object[]{ channel });
   }
 
 // End helpers for Client

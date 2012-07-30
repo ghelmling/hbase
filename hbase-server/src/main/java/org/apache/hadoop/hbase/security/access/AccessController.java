@@ -50,7 +50,6 @@ import org.apache.hadoop.hbase.filter.ByteArrayComparable;
 import org.apache.hadoop.hbase.ipc.HBaseRPC;
 import org.apache.hadoop.hbase.ipc.ProtocolSignature;
 import org.apache.hadoop.hbase.ipc.RequestContext;
-import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
@@ -70,7 +69,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.MapMaker;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import org.apache.hadoop.util.StringUtils;
 
 import static org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos.AccessControlService;
 
@@ -1198,7 +1196,7 @@ public class AccessController extends BaseRegionObserver
       response = AccessControlProtos.GrantResponse.getDefaultInstance();
     } catch (IOException ioe) {
       // pass exception back up
-      setControllerException(controller, ioe);
+      ResponseConverter.setControllerException(controller, ioe);
     }
     done.run(response);
   }
@@ -1214,7 +1212,7 @@ public class AccessController extends BaseRegionObserver
       response = AccessControlProtos.RevokeResponse.getDefaultInstance();
     } catch (IOException ioe) {
       // pass exception back up
-      setControllerException(controller, ioe);
+      ResponseConverter.setControllerException(controller, ioe);
     }
     done.run(response);
   }
@@ -1230,7 +1228,7 @@ public class AccessController extends BaseRegionObserver
       response = ResponseConverter.buildUserPermissionsResponse(perms);
     } catch (IOException ioe) {
       // pass exception back up
-      setControllerException(controller, ioe);
+      ResponseConverter.setControllerException(controller, ioe);
     }
     done.run(response);
   }
@@ -1248,7 +1246,7 @@ public class AccessController extends BaseRegionObserver
       checkPermissions(perms);
       response = AccessControlProtos.CheckPermissionsResponse.getDefaultInstance();
     } catch (IOException ioe) {
-      setControllerException(controller, ioe);
+      ResponseConverter.setControllerException(controller, ioe);
     }
     done.run(response);
   }
@@ -1256,16 +1254,6 @@ public class AccessController extends BaseRegionObserver
   @Override
   public Service getService() {
     return AccessControlProtos.AccessControlService.newReflectiveService(this);
-  }
-
-  private void setControllerException(RpcController controller, IOException ioe) {
-    if (controller != null) {
-      if (controller instanceof ServerRpcController) {
-        ((ServerRpcController)controller).setFailedOn(ioe);
-      } else {
-        controller.setFailed(StringUtils.stringifyException(ioe));
-      }
-    }
   }
 
   private byte[] getTableName(RegionCoprocessorEnvironment e) {

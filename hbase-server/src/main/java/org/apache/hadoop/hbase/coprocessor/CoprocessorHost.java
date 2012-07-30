@@ -19,6 +19,8 @@
 
 package org.apache.hadoop.hbase.coprocessor;
 
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience;
@@ -540,6 +542,13 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       @Override
       public CoprocessorRpcChannel coprocessorService(byte[] row) {
         return table.coprocessorService(row);
+      }
+
+      @Override
+      public <T extends Service, R> void coprocessorService(Class<T> service,
+          byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback)
+          throws ServiceException, Throwable {
+        table.coprocessorService(service, startKey, endKey, callable, callback);
       }
 
       @Override

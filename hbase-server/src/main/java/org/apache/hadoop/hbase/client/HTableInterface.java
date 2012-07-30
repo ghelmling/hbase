@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import com.google.protobuf.Service;
+import com.google.protobuf.ServiceException;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.conf.Configuration;
@@ -521,6 +523,10 @@ public interface HTableInterface extends Closeable {
    * @return A CoprocessorRpcChannel instance
    */
   CoprocessorRpcChannel coprocessorService(byte[] row);
+
+  <T extends Service, R> void coprocessorService(final Class<T> service,
+      byte[] startKey, byte[] endKey, final Batch.Call<T,R> callable,
+      final Batch.Callback<R> callback) throws ServiceException, Throwable;
 
   /**
    * See {@link #setAutoFlush(boolean, boolean)}

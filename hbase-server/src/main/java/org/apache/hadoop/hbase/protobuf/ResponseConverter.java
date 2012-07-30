@@ -21,10 +21,12 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.google.protobuf.RpcController;
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.hbase.HRegionInfo;
 import org.apache.hadoop.hbase.ServerName;
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.protobuf.generated.AccessControlProtos;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.CloseRegionResponse;
 import org.apache.hadoop.hbase.protobuf.generated.AdminProtos.GetOnlineRegionResponse;
@@ -265,4 +267,19 @@ public final class ResponseConverter {
     return GetLastFlushedSequenceIdResponse.newBuilder().setLastFlushedSequenceId(seqId).build();
   }
 
+  /**
+   * Stores an exception encountered during RPC invocation so it can be passed back
+   * through to the client.
+   * @param controller the controller instance provided by the client when calling the service
+   * @param ioe the exception encountered
+   */
+  public static void setControllerException(RpcController controller, IOException ioe) {
+    if (controller != null) {
+      if (controller instanceof ServerRpcController) {
+        ((ServerRpcController)controller).setFailedOn(ioe);
+      } else {
+        controller.setFailed(StringUtils.stringifyException(ioe));
+      }
+    }
+  }
 }

@@ -24,27 +24,24 @@ import static org.junit.Assert.assertEquals;
 import java.io.IOException;
 import java.util.Map;
 
+import com.google.protobuf.RpcCallback;
+import com.google.protobuf.RpcController;
+import com.google.protobuf.Service;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
-import org.apache.hadoop.hbase.HBaseTestingUtility;
-import org.apache.hadoop.hbase.HConstants;
-import org.apache.hadoop.hbase.MediumTests;
-import org.apache.hadoop.hbase.MiniHBaseCluster;
+import org.apache.hadoop.hbase.*;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
-import org.apache.hadoop.hbase.client.coprocessor.Exec;
-import org.apache.hadoop.hbase.io.HbaseObjectWritable;
-import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
-import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
+import org.apache.hadoop.hbase.ipc.protobuf.generated.TestProtos;
+import org.apache.hadoop.hbase.ipc.protobuf.generated.TestRpcServiceProtos;
+import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.io.DataInputBuffer;
-import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.io.Text;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -55,6 +52,35 @@ import com.google.protobuf.ByteString;
  */
 @Category(MediumTests.class)
 public class TestCoprocessorEndpoint {
+  private static final Log LOG = LogFactory.getLog(TestCoprocessorEndpoint.class);
+
+  public static class ProtobufCoprocessorService
+      implements TestRpcServiceProtos.TestProtobufRpcProto.Interface, CoprocessorService {
+    @Override
+    public Service getService() {
+      return TestRpcServiceProtos.TestProtobufRpcProto.newReflectiveService(this);
+    }
+
+    @Override
+    public void ping(RpcController controller, TestProtos.EmptyRequestProto request,
+                     RpcCallback<TestProtos.EmptyResponseProto> done) {
+      done.run(TestProtos.EmptyResponseProto.getDefaultInstance());
+    }
+
+    @Override
+    public void echo(RpcController controller, TestProtos.EchoRequestProto request,
+                     RpcCallback<TestProtos.EchoResponseProto> done) {
+      String message = request.getMessage();
+      done.run(TestProtos.EchoResponseProto.newBuilder().setMessage(message).build());
+    }
+
+    @Override
+    public void error(RpcController controller, TestProtos.EmptyRequestProto request,
+                      RpcCallback<TestProtos.EmptyResponseProto> done) {
+      ResponseConverter.setControllerException(controller, new IOException("Test exception"));
+      done.run(null);
+    }
+  }
 
   private static final byte[] TEST_TABLE = Bytes.toBytes("TestTable");
   private static final byte[] TEST_FAMILY = Bytes.toBytes("TestFamily");
@@ -76,26 +102,21 @@ public class TestCoprocessorEndpoint {
     // set configure to indicate which cp should be loaded
     Configuration conf = util.getConfiguration();
     conf.setStrings(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY,
-        "org.apache.hadoop.hbase.coprocessor.ColumnAggregationEndpoint",
-        "org.apache.hadoop.hbase.coprocessor.GenericEndpoint");
+        org.apache.hadoop.hbase.coprocessor.ColumnAggregationEndpoint.class.getName(),
+        org.apache.hadoop.hbase.coprocessor.GenericEndpoint.class.getName());
     util.startMiniCluster(2);
-    HTable table = util.createTable(TEST_TABLE, TEST_FAMILY);
-    util.createMultiRegions(util.getConfiguration(), table, TEST_FAMILY,
-                            new byte[][] { HConstants.EMPTY_BYTE_ARRAY,
-                                ROWS[rowSeperator1], ROWS[rowSeperator2] });
+    HBaseAdmin admin = new HBaseAdmin(conf);
+    HTableDescriptor desc = new HTableDescriptor(TEST_TABLE);
+    desc.addFamily(new HColumnDescriptor(TEST_FAMILY));
+    admin.createTable(desc, new byte[][]{ROWS[rowSeperator1], ROWS[rowSeperator2]});
+    util.waitUntilAllRegionsAssigned(3);
+    admin.close();
 
+    HTable table = new HTable(conf, TEST_TABLE);
     for (int i = 0; i < ROWSIZE; i++) {
       Put put = new Put(ROWS[i]);
-      put.setWriteToWAL(false);
       put.add(TEST_FAMILY, TEST_QUALIFIER, Bytes.toBytes(i));
       table.put(put);
-    }
-
-    // sleep here is an ugly hack to allow region transitions to finish
-    long timeout = System.currentTimeMillis() + (15 * 1000);
-    while ((System.currentTimeMillis() < timeout) &&
-      (table.getRegionsInfo().size() != 2)) {
-      Thread.sleep(250);
     }
     table.close();
   }
@@ -135,7 +156,7 @@ public class TestCoprocessorEndpoint {
     table.close();
   }
 
-  @Ignore @Test
+  @Test
   public void testAggregation() throws Throwable {
     HTable table = new HTable(util.getConfiguration(), TEST_TABLE);
     Map<byte[], Long> results;
@@ -143,7 +164,7 @@ public class TestCoprocessorEndpoint {
     // scan: for all regions
     results = table
         .coprocessorExec(ColumnAggregationProtocol.class,
-                         ROWS[rowSeperator1 - 1], ROWS[rowSeperator2 + 1],
+                         ROWS[0], ROWS[ROWS.length-1],
                          new Batch.Call<ColumnAggregationProtocol, Long>() {
                            public Long call(ColumnAggregationProtocol instance)
                                throws IOException {
@@ -153,19 +174,20 @@ public class TestCoprocessorEndpoint {
     int sumResult = 0;
     int expectedResult = 0;
     for (Map.Entry<byte[], Long> e : results.entrySet()) {
+      LOG.info("Got value "+e.getValue()+" for region "+Bytes.toStringBinary(e.getKey()));
       sumResult += e.getValue();
     }
     for (int i = 0; i < ROWSIZE; i++) {
       expectedResult += i;
     }
-    assertEquals("Invalid result", sumResult, expectedResult);
+    assertEquals("Invalid result", expectedResult, sumResult);
 
     results.clear();
 
     // scan: for region 2 and region 3
     results = table
         .coprocessorExec(ColumnAggregationProtocol.class,
-                         ROWS[rowSeperator1 + 1], ROWS[rowSeperator2 + 1],
+                         ROWS[rowSeperator1], ROWS[ROWS.length-1],
                          new Batch.Call<ColumnAggregationProtocol, Long>() {
                            public Long call(ColumnAggregationProtocol instance)
                                throws IOException {
@@ -175,12 +197,13 @@ public class TestCoprocessorEndpoint {
     sumResult = 0;
     expectedResult = 0;
     for (Map.Entry<byte[], Long> e : results.entrySet()) {
+      LOG.info("Got value "+e.getValue()+" for region "+Bytes.toStringBinary(e.getKey()));
       sumResult += e.getValue();
     }
     for (int i = rowSeperator1; i < ROWSIZE; i++) {
       expectedResult += i;
     }
-    assertEquals("Invalid result", sumResult, expectedResult);
+    assertEquals("Invalid result", expectedResult, sumResult);
     table.close();
   }
 

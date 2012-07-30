@@ -24,6 +24,7 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
   private final HConnection connection;
   private final byte[] table;
   private final byte[] row;
+  private byte[] lastRegion;
 
   public CoprocessorRpcChannel(Configuration conf, HConnection conn,
                                byte[] table, byte[] row) {
@@ -96,8 +97,14 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
     } else {
       response = responsePrototype.getDefaultInstanceForType();
     }
-    LOG.debug("Result is region="+ Bytes.toStringBinary(
-        result.getRegion().getValue().toByteArray()) + ", value="+response);
+    lastRegion = result.getRegion().getValue().toByteArray();
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Result is region="+ Bytes.toStringBinary(lastRegion) + ", value="+response);
+    }
     return response;
+  }
+
+  public byte[] getLastRegion() {
+    return lastRegion;
   }
 }
