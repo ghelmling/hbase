@@ -18,15 +18,12 @@
  */
 package org.apache.hadoop.hbase.coprocessor;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-
 import java.io.IOException;
 import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
 
-import com.google.protobuf.RpcCallback;
 import com.google.protobuf.RpcController;
-import com.google.protobuf.Service;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -35,9 +32,9 @@ import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
+import org.apache.hadoop.hbase.ipc.ServerRpcController;
 import org.apache.hadoop.hbase.ipc.protobuf.generated.TestProtos;
 import org.apache.hadoop.hbase.ipc.protobuf.generated.TestRpcServiceProtos;
-import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.io.Text;
 import org.junit.AfterClass;
@@ -45,7 +42,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
-import com.google.protobuf.ByteString;
+import static org.junit.Assert.*;
 
 /**
  * TestEndpoint: test cases to verify coprocessor Endpoint
@@ -53,34 +50,6 @@ import com.google.protobuf.ByteString;
 @Category(MediumTests.class)
 public class TestCoprocessorEndpoint {
   private static final Log LOG = LogFactory.getLog(TestCoprocessorEndpoint.class);
-
-  public static class ProtobufCoprocessorService
-      implements TestRpcServiceProtos.TestProtobufRpcProto.Interface, CoprocessorService {
-    @Override
-    public Service getService() {
-      return TestRpcServiceProtos.TestProtobufRpcProto.newReflectiveService(this);
-    }
-
-    @Override
-    public void ping(RpcController controller, TestProtos.EmptyRequestProto request,
-                     RpcCallback<TestProtos.EmptyResponseProto> done) {
-      done.run(TestProtos.EmptyResponseProto.getDefaultInstance());
-    }
-
-    @Override
-    public void echo(RpcController controller, TestProtos.EchoRequestProto request,
-                     RpcCallback<TestProtos.EchoResponseProto> done) {
-      String message = request.getMessage();
-      done.run(TestProtos.EchoResponseProto.newBuilder().setMessage(message).build());
-    }
-
-    @Override
-    public void error(RpcController controller, TestProtos.EmptyRequestProto request,
-                      RpcCallback<TestProtos.EmptyResponseProto> done) {
-      ResponseConverter.setControllerException(controller, new IOException("Test exception"));
-      done.run(null);
-    }
-  }
 
   private static final byte[] TEST_TABLE = Bytes.toBytes("TestTable");
   private static final byte[] TEST_FAMILY = Bytes.toBytes("TestFamily");
@@ -103,7 +72,8 @@ public class TestCoprocessorEndpoint {
     Configuration conf = util.getConfiguration();
     conf.setStrings(CoprocessorHost.REGION_COPROCESSOR_CONF_KEY,
         org.apache.hadoop.hbase.coprocessor.ColumnAggregationEndpoint.class.getName(),
-        org.apache.hadoop.hbase.coprocessor.GenericEndpoint.class.getName());
+        org.apache.hadoop.hbase.coprocessor.GenericEndpoint.class.getName(),
+        ProtobufCoprocessorService.class.getName());
     util.startMiniCluster(2);
     HBaseAdmin admin = new HBaseAdmin(conf);
     HTableDescriptor desc = new HTableDescriptor(TEST_TABLE);
@@ -205,6 +175,79 @@ public class TestCoprocessorEndpoint {
     }
     assertEquals("Invalid result", expectedResult, sumResult);
     table.close();
+  }
+
+  @Test
+  public void testCoprocessorService() throws Throwable {
+    HTable table = new HTable(util.getConfiguration(), TEST_TABLE);
+    NavigableMap<HRegionInfo,ServerName> regions = table.getRegionLocations();
+
+    final TestProtos.EchoRequestProto request =
+        TestProtos.EchoRequestProto.newBuilder().setMessage("hello").build();
+    final Map<byte[], String> results = new TreeMap<byte[], String>(Bytes.BYTES_COMPARATOR);
+    try {
+      // scan: for all regions
+      final RpcController controller = new ServerRpcController();
+      table.coprocessorService(TestRpcServiceProtos.TestProtobufRpcProto.class,
+          ROWS[0], ROWS[ROWS.length - 1],
+          new Batch.Call<TestRpcServiceProtos.TestProtobufRpcProto, TestProtos.EchoResponseProto>() {
+            public TestProtos.EchoResponseProto call(TestRpcServiceProtos.TestProtobufRpcProto instance)
+                throws IOException {
+              LOG.debug("Default response is " + TestProtos.EchoRequestProto.getDefaultInstance());
+              BlockingRpcCallback<TestProtos.EchoResponseProto> callback = new BlockingRpcCallback<TestProtos.EchoResponseProto>();
+              instance.echo(controller, request, callback);
+              TestProtos.EchoResponseProto response = callback.get();
+              LOG.debug("Batch.Call returning result " + response);
+              return response;
+            }
+          },
+          new Batch.Callback<TestProtos.EchoResponseProto>() {
+            public void update(byte[] region, byte[] row, TestProtos.EchoResponseProto result) {
+              assertNotNull(result);
+              assertEquals("hello", result.getMessage());
+              results.put(region, result.getMessage());
+            }
+          }
+      );
+      for (Map.Entry<byte[], String> e : results.entrySet()) {
+        LOG.info("Got value "+e.getValue()+" for region "+Bytes.toStringBinary(e.getKey()));
+      }
+      assertEquals(3, results.size());
+      for (HRegionInfo info : regions.navigableKeySet()) {
+        LOG.info("Region info is "+info.getRegionNameAsString());
+        assertTrue(results.containsKey(info.getRegionName()));
+      }
+      results.clear();
+
+      // scan: for region 2 and region 3
+      table.coprocessorService(TestRpcServiceProtos.TestProtobufRpcProto.class,
+          ROWS[rowSeperator1], ROWS[ROWS.length - 1],
+          new Batch.Call<TestRpcServiceProtos.TestProtobufRpcProto, TestProtos.EchoResponseProto>() {
+            public TestProtos.EchoResponseProto call(TestRpcServiceProtos.TestProtobufRpcProto instance)
+                throws IOException {
+              LOG.debug("Default response is " + TestProtos.EchoRequestProto.getDefaultInstance());
+              BlockingRpcCallback<TestProtos.EchoResponseProto> callback = new BlockingRpcCallback<TestProtos.EchoResponseProto>();
+              instance.echo(controller, request, callback);
+              TestProtos.EchoResponseProto response = callback.get();
+              LOG.debug("Batch.Call returning result " + response);
+              return response;
+            }
+          },
+          new Batch.Callback<TestProtos.EchoResponseProto>() {
+            public void update(byte[] region, byte[] row, TestProtos.EchoResponseProto result) {
+              assertNotNull(result);
+              assertEquals("hello", result.getMessage());
+              results.put(region, result.getMessage());
+            }
+          }
+      );
+      for (Map.Entry<byte[], String> e : results.entrySet()) {
+        LOG.info("Got value "+e.getValue()+" for region "+Bytes.toStringBinary(e.getKey()));
+      }
+      assertEquals(2, results.size());
+    } finally {
+      table.close();
+    }
   }
 
   private static byte[][] makeN(byte[] base, int n) {

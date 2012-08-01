@@ -253,6 +253,11 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
    */
   public E loadInstance(Class<?> implClass, int priority, Configuration conf)
       throws IOException {
+    if (!Coprocessor.class.isAssignableFrom(implClass)) {
+      throw new IOException("Configured class " + implClass.getName() + " must implement "
+          + Coprocessor.class.getName() + " interface ");
+    }
+
     // create the instance
     Coprocessor impl;
     Object o = null;

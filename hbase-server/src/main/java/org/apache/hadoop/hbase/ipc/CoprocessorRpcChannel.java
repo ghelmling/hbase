@@ -41,8 +41,9 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
                          RpcCallback<Message> callback) {
     Message response = null;
     try {
-      response = callExecService(method, request, response);
+      response = callExecService(method, request, responsePrototype);
     } catch (IOException ioe) {
+      LOG.warn("Call failed on IOException", ioe);
       if (controller != null) {
         controller.setFailed(ioe.getMessage());
       }
@@ -91,7 +92,9 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
     CoprocessorServiceResponse result = callable.withRetries();
     Message response = null;
     if (result.getValue().hasValue()) {
-      LOG.debug("Result is "+result+", result value is "+result.getValue());
+      if (LOG.isDebugEnabled()) {
+        LOG.debug("Result is "+result+", result value is "+result.getValue());
+      }
       response = responsePrototype.newBuilderForType()
           .mergeFrom(result.getValue().getValue()).build();
     } else {
