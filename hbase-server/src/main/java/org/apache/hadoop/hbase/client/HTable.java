@@ -1322,7 +1322,6 @@ public class HTable implements HTableInterface {
 
   /**
    * {@inheritDoc}
-   * @deprecated since 0.96
    */
   @Override
   @Deprecated
@@ -1337,6 +1336,9 @@ public class HTable implements HTableInterface {
             row));
   }
 
+  /**
+   * {@inheritDoc}
+   */
   public CoprocessorRpcChannel coprocessorService(byte[] row) {
     return new CoprocessorRpcChannel(configuration, connection, tableName, row);
   }
@@ -1378,6 +1380,27 @@ public class HTable implements HTableInterface {
         callback);
   }
 
+  /**
+   * {@inheritDoc}
+   */
+  @Override
+  public <T extends Service, R> Map<byte[],R> coprocessorService(final Class<T> service,
+      byte[] startKey, byte[] endKey, final Batch.Call<T,R> callable)
+      throws ServiceException, Throwable {
+    final Map<byte[],R> results =  Collections.synchronizedMap(new TreeMap<byte[],R>(
+        Bytes.BYTES_COMPARATOR));
+    coprocessorService(service, startKey, endKey, callable, new Batch.Callback<R>(){
+      public void update(byte[] region, byte[] row, R value) {
+        results.put(region, value);
+      }
+    });
+    return results;
+  }
+
+  /**
+   * {@inheritDoc}
+   */
+  @Override
   public <T extends Service, R> void coprocessorService(final Class<T> service,
       byte[] startKey, byte[] endKey, final Batch.Call<T,R> callable,
       final Batch.Callback<R> callback) throws ServiceException, Throwable {

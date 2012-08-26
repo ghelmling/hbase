@@ -19,6 +19,7 @@
 package org.apache.hadoop.hbase.coprocessor;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
@@ -184,7 +185,8 @@ public class TestCoprocessorEndpoint {
 
     final TestProtos.EchoRequestProto request =
         TestProtos.EchoRequestProto.newBuilder().setMessage("hello").build();
-    final Map<byte[], String> results = new TreeMap<byte[], String>(Bytes.BYTES_COMPARATOR);
+    final Map<byte[], String> results = Collections.synchronizedMap(
+        new TreeMap<byte[], String>(Bytes.BYTES_COMPARATOR));
     try {
       // scan: for all regions
       final RpcController controller = new ServerRpcController();

@@ -443,7 +443,7 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
           byte[] qualifier, long amount, boolean writeToWAL)
           throws IOException {
         return table.incrementColumnValue(row, family, qualifier, amount,
-          writeToWAL);
+            writeToWAL);
       }
 
       @Override
@@ -547,6 +547,13 @@ public abstract class CoprocessorHost<E extends CoprocessorEnvironment> {
       @Override
       public CoprocessorRpcChannel coprocessorService(byte[] row) {
         return table.coprocessorService(row);
+      }
+
+      @Override
+      public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service,
+          byte[] startKey, byte[] endKey, Batch.Call<T, R> callable)
+          throws ServiceException, Throwable {
+        return table.coprocessorService(service, startKey, endKey, callable);
       }
 
       @Override

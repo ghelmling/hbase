@@ -741,6 +741,13 @@ public class RemoteHTable implements HTableInterface {
   }
 
   @Override
+  public <T extends Service, R> Map<byte[], R> coprocessorService(Class<T> service,
+      byte[] startKey, byte[] endKey, Batch.Call<T, R> callable)
+      throws ServiceException, Throwable {
+    throw new UnsupportedOperationException("coprocessorService not implemented");
+  }
+
+  @Override
   public <T extends Service, R> void coprocessorService(Class<T> service,
       byte[] startKey, byte[] endKey, Batch.Call<T, R> callable, Batch.Callback<R> callback)
       throws ServiceException, Throwable {
