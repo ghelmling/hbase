@@ -8,8 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 /**
  */
 public class BlockingRpcCallback<R> implements RpcCallback<R> {
-  R result;
-  boolean resultSet = false;
+  private R result;
+  private boolean resultSet = false;
 
   public void run(R parameter) {
     synchronized (this) {
@@ -26,16 +26,15 @@ public class BlockingRpcCallback<R> implements RpcCallback<R> {
    * @return
    */
   public synchronized R get() throws IOException {
-    if (resultSet) {
-      return result;
+    while (!resultSet) {
+      try {
+        this.wait();
+      } catch (InterruptedException ie) {
+        // awful, but this will be used where we only expect IOException
+        Thread.currentThread().interrupt();
+        throw new IOException(ie);
+      }
     }
-    try {
-      this.wait();
-      return result;
-    } catch (InterruptedException ie) {
-      // awful, but this will be used where we only expect IOException
-      Thread.currentThread().interrupt();
-      throw new IOException(ie);
-    }
+    return result;
   }
 }
