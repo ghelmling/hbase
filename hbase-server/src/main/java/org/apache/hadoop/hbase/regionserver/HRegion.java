@@ -219,7 +219,7 @@ public class HRegion implements HeapSize { // , Writable{
   private Map<String, Class<? extends CoprocessorProtocol>>
       protocolHandlerNames = Maps.newHashMap();
 
-  // TODO: add to HeapSize computation
+  // TODO: account for each registered handler in HeapSize computation
   private Map<String, Service> coprocessorServiceHandlers = Maps.newHashMap();
 
   /**
@@ -5034,7 +5034,7 @@ public class HRegion implements HeapSize { // , Writable{
   public static final long FIXED_OVERHEAD = ClassSize.align(
       ClassSize.OBJECT +
       ClassSize.ARRAY +
-      36 * ClassSize.REFERENCE + Bytes.SIZEOF_INT +
+      37 * ClassSize.REFERENCE + Bytes.SIZEOF_INT +
       (7 * Bytes.SIZEOF_LONG) +
       Bytes.SIZEOF_BOOLEAN);
 
@@ -5203,6 +5203,20 @@ public class HRegion implements HeapSize { // , Writable{
     return new ExecResult(getRegionName(), value);
   }
 
+  /**
+   * Executes a single protocol buffer coprocessor endpoint {@link Service} method using
+   * the registered protocol handlers.  {@link Service} implementations must be registered via the
+   * {@link org.apache.hadoop.hbase.regionserver.HRegion#registerService(com.google.protobuf.Service)}
+   * method before they are available.
+   *
+   * @param controller an {@code RpcContoller} implementation to pass to the invoked service
+   * @param call a {@code CoprocessorServiceCall} instance identifying the service, method,
+   *     and parameters for the method invocation
+   * @return a protocol buffer {@code Message} instance containing the method's result
+   * @throws IOException if no registered service handler is found or an error
+   *     occurs during the invocation
+   * @see org.apache.hadoop.hbase.regionserver.HRegion#registerService(com.google.protobuf.Service)
+   */
   public Message execService(RpcController controller, CoprocessorServiceCall call)
       throws IOException {
     String serviceName = call.getServiceName();
@@ -5226,7 +5240,6 @@ public class HRegion implements HeapSize { // , Writable{
         .mergeFrom(call.getRequest()).build();
     final Message.Builder responseBuilder =
         service.getResponsePrototype(methodDesc).newBuilderForType();
-    // TODO: need to pass down an RpcController impl for error handling
     service.callMethod(methodDesc, controller, request, new RpcCallback<Message>() {
       @Override
       public void run(Message message) {
