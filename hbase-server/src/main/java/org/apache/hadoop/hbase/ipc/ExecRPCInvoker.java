@@ -39,6 +39,7 @@ import org.apache.hadoop.hbase.util.Bytes;
  * {@link org.apache.hadoop.hbase.client.ServerCallable} instance).
  */
 @InterfaceAudience.Private
+@Deprecated
 public class ExecRPCInvoker implements InvocationHandler {
   // LOG is NOT in hbase subpackage intentionally so that the default HBase
   // DEBUG log level does NOT emit RPC-level logging. 

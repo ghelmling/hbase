@@ -21,6 +21,7 @@ package org.apache.hadoop.hbase.ipc;
 import com.google.protobuf.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.ServerCallable;
@@ -34,19 +35,23 @@ import java.io.IOException;
 import static org.apache.hadoop.hbase.protobuf.generated.ClientProtos.CoprocessorServiceResponse;
 
 /**
+ * Provides clients with an RPC connection to call coprocessor endpoint {@link Service}s
+ * against a given table region.  An instance of this class may be obtained
+ * by calling {@link org.apache.hadoop.hbase.client.HTable#coprocessorService(byte[])},
+ * but should normally only be used in creating a new {@link Service} stub to call the endpoint
+ * methods.
+ * @see org.apache.hadoop.hbase.client.HTable#coprocessorService(byte[])
  */
+@InterfaceAudience.Private
 public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
   private static Log LOG = LogFactory.getLog(CoprocessorRpcChannel.class);
 
-  private Configuration conf;
   private final HConnection connection;
   private final byte[] table;
   private final byte[] row;
   private byte[] lastRegion;
 
-  public CoprocessorRpcChannel(Configuration conf, HConnection conn,
-                               byte[] table, byte[] row) {
-    this.conf = conf;
+  public CoprocessorRpcChannel(HConnection conn, byte[] table, byte[] row) {
     this.connection = conn;
     this.table = table;
     this.row = row;

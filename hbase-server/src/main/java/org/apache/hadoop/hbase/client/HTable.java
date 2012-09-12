@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -1340,7 +1341,7 @@ public class HTable implements HTableInterface {
    * {@inheritDoc}
    */
   public CoprocessorRpcChannel coprocessorService(byte[] row) {
-    return new CoprocessorRpcChannel(configuration, connection, tableName, row);
+    return new CoprocessorRpcChannel(connection, tableName, row);
   }
 
   /**
@@ -1387,9 +1388,8 @@ public class HTable implements HTableInterface {
   public <T extends Service, R> Map<byte[],R> coprocessorService(final Class<T> service,
       byte[] startKey, byte[] endKey, final Batch.Call<T,R> callable)
       throws ServiceException, Throwable {
-    final Map<byte[],R> results =  Collections.synchronizedMap(new TreeMap<byte[],R>(
-        Bytes.BYTES_COMPARATOR));
-    coprocessorService(service, startKey, endKey, callable, new Batch.Callback<R>(){
+    final Map<byte[],R> results =  new ConcurrentSkipListMap<byte[], R>(Bytes.BYTES_COMPARATOR);
+    coprocessorService(service, startKey, endKey, callable, new Batch.Callback<R>() {
       public void update(byte[] region, byte[] row, R value) {
         results.put(region, value);
       }
@@ -1412,7 +1412,7 @@ public class HTable implements HTableInterface {
         new TreeMap<byte[],Future<R>>(Bytes.BYTES_COMPARATOR);
     for (final byte[] r : keys) {
       final CoprocessorRpcChannel channel =
-          new CoprocessorRpcChannel(configuration, connection, tableName, r);
+          new CoprocessorRpcChannel(connection, tableName, r);
       Future<R> future = pool.submit(
           new Callable<R>() {
             public R call() throws Exception {
@@ -1436,8 +1436,9 @@ public class HTable implements HTableInterface {
         throw ee.getCause();
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
-        throw new IOException("Interrupted calling coprocessor service " + service.getName()
-            + " for row " + Bytes.toStringBinary(e.getKey()), ie);
+        throw new InterruptedIOException("Interrupted calling coprocessor service " + service.getName()
+            + " for row " + Bytes.toStringBinary(e.getKey()))
+            .initCause(ie);
       }
     }
   }

@@ -124,7 +124,7 @@ public final class ResponseConverter {
   }
 
   /**
-   *
+   * Converts the permissions list into a protocol buffer UserPermissionsResponse
    */
   public static UserPermissionsResponse buildUserPermissionsResponse(
       final List<UserPermission> permissions) {

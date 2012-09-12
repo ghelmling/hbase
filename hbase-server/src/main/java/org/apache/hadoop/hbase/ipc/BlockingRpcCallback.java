@@ -16,19 +16,27 @@
  * limitations under the License.
  */
 
-package org.apache.hadoop.hbase.coprocessor;
+package org.apache.hadoop.hbase.ipc;
 
 import com.google.protobuf.RpcCallback;
+import org.apache.hadoop.classification.InterfaceAudience;
+import org.apache.hadoop.classification.InterfaceStability;
 
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.InterruptedIOException;
 
 /**
+ * Simple {@link RpcCallback} implementation providing a
+ * {@link java.util.concurrent.Future}-like {@link BlockingRpcCallback#get()} method, which
+ * will block util the instance's {@link BlockingRpcCallback#run(Object)} method has been called.
  */
+@InterfaceAudience.Public
+@InterfaceStability.Evolving
 public class BlockingRpcCallback<R> implements RpcCallback<R> {
   private R result;
   private boolean resultSet = false;
 
+  @Override
   public void run(R parameter) {
     synchronized (this) {
       result = parameter;
@@ -50,7 +58,7 @@ public class BlockingRpcCallback<R> implements RpcCallback<R> {
       } catch (InterruptedException ie) {
         // awful, but this will be used where we only expect IOException
         Thread.currentThread().interrupt();
-        throw new IOException(ie);
+        throw (IOException) new InterruptedIOException(ie.getMessage()).initCause(ie);
       }
     }
     return result;

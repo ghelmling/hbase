@@ -1821,8 +1821,8 @@ public final class ProtobufUtil {
 
   /**
    * Unwraps an exception from a protobuf service into the underlying (expected) IOException.
-   * @param se
-   * @return
+   * This method will <strong>always</strong> throw an exception.
+   * @param se the {@code ServiceException} instance to convert into an {@code IOException}
    */
   public static void toIOException(ServiceException se) throws IOException {
     if (se == null) {
