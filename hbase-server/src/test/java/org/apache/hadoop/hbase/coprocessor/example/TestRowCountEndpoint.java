@@ -104,4 +104,8 @@ public class TestRowCountEndpoint {
     assertNotNull(val);
     assertEquals(5l, val.longValue());
   }
+
+  @org.junit.Rule
+  public org.apache.hadoop.hbase.ResourceCheckerJUnitRule cu =
+      new org.apache.hadoop.hbase.ResourceCheckerJUnitRule();
 }
