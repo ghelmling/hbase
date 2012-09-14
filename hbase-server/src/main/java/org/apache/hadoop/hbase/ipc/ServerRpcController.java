@@ -116,7 +116,7 @@ public class ServerRpcController implements RpcController {
   }
 
   /**
-   * Returns whether or not an a server exception was generated in the prior RPC invocation.
+   * Returns whether or not a server exception was generated in the prior RPC invocation.
    */
   public boolean failedOnException() {
     return serviceException != null;

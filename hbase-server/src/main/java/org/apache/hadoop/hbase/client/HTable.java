@@ -1391,7 +1391,14 @@ public class HTable implements HTableInterface {
     final Map<byte[],R> results =  new ConcurrentSkipListMap<byte[], R>(Bytes.BYTES_COMPARATOR);
     coprocessorService(service, startKey, endKey, callable, new Batch.Callback<R>() {
       public void update(byte[] region, byte[] row, R value) {
-        results.put(region, value);
+        if (value == null) {
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("Call to " + service.getName() +
+                " received NULL value from Batch.Call for region " + Bytes.toStringBinary(region));
+          }
+        } else {
+          results.put(region, value);
+        }
       }
     });
     return results;

@@ -27,6 +27,7 @@ import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.ServerCallable;
 import org.apache.hadoop.hbase.client.coprocessor.Exec;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
+import org.apache.hadoop.hbase.protobuf.ResponseConverter;
 import org.apache.hadoop.hbase.protobuf.generated.ClientProtos;
 import org.apache.hadoop.hbase.util.Bytes;
 
@@ -67,9 +68,7 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
       response = callExecService(method, request, responsePrototype);
     } catch (IOException ioe) {
       LOG.warn("Call failed on IOException", ioe);
-      if (controller != null) {
-        controller.setFailed(ioe.getMessage());
-      }
+      ResponseConverter.setControllerException(controller, ioe);
     }
     if (callback != null) {
       callback.run(response);
@@ -115,17 +114,14 @@ public class CoprocessorRpcChannel implements RpcChannel, BlockingRpcChannel {
     CoprocessorServiceResponse result = callable.withRetries();
     Message response = null;
     if (result.getValue().hasValue()) {
-      if (LOG.isDebugEnabled()) {
-        LOG.debug("Result is "+result+", result value is "+result.getValue());
-      }
       response = responsePrototype.newBuilderForType()
           .mergeFrom(result.getValue().getValue()).build();
     } else {
       response = responsePrototype.getDefaultInstanceForType();
     }
     lastRegion = result.getRegion().getValue().toByteArray();
-    if (LOG.isDebugEnabled()) {
-      LOG.debug("Result is region="+ Bytes.toStringBinary(lastRegion) + ", value="+response);
+    if (LOG.isTraceEnabled()) {
+      LOG.trace("Result is region=" + Bytes.toStringBinary(lastRegion) + ", value=" + response);
     }
     return response;
   }
