@@ -75,6 +75,8 @@ import org.apache.hadoop.hbase.client.MetaScanner.MetaScannerVisitor;
 import org.apache.hadoop.hbase.client.MetaScanner.MetaScannerVisitorBase;
 import org.apache.hadoop.hbase.client.coprocessor.Batch;
 import org.apache.hadoop.hbase.ipc.HBaseClientRPC;
+import org.apache.hadoop.hbase.ipc.ProtobufRpcClientEngine;
+import org.apache.hadoop.hbase.ipc.RpcClientEngine;
 import org.apache.hadoop.hbase.protobuf.ProtobufUtil;
 import org.apache.hadoop.hbase.protobuf.RequestConverter;
 import org.apache.hadoop.hbase.protobuf.generated.HBaseProtos.TableSchema;
@@ -247,7 +249,7 @@ public class HConnectionManager {
    * @param stopProxy
    *          Shuts down all the proxy's put up to cluster members including to
    *          cluster HMaster. Calls
-   *          {@link HBaseClientRPC#stopProxy(IpcProtocol)}
+   *          {@link ProtobufRpcClientEngine#stopProxy(org.apache.hadoop.hbase.IpcProtocol)}
    *          .
    */
   public static void deleteConnection(Configuration conf, boolean stopProxy) {
@@ -549,6 +551,9 @@ public class HConnectionManager {
 
     private final Configuration conf;
 
+    // client RPC
+    private RpcClientEngine rpcEngine;
+
     // Known region ServerName.toString() -> RegionClient/Admin
     private final ConcurrentHashMap<String, Map<String, IpcProtocol>> servers =
       new ConcurrentHashMap<String, Map<String, IpcProtocol>>();
@@ -589,6 +594,7 @@ public class HConnectionManager {
     throws ZooKeeperConnectionException {
       this.conf = conf;
       this.managed = managed;
+      this.rpcEngine = new ProtobufRpcClientEngine(conf);
       String adminClassName = conf.get(REGION_PROTOCOL_CLASS,
         DEFAULT_ADMIN_PROTOCOL_CLASS);
       this.closed = false;
@@ -716,7 +722,7 @@ public class HConnectionManager {
 
         InetSocketAddress isa =
           new InetSocketAddress(sn.getHostname(), sn.getPort());
-        MasterProtocol tryMaster = (MasterProtocol)HBaseClientRPC.getProxy(
+        MasterProtocol tryMaster = rpcEngine.getProxy(
             masterProtocolState.protocolClass,
             isa, this.conf, this.rpcTimeout);
 
@@ -724,7 +730,7 @@ public class HConnectionManager {
             null, RequestConverter.buildIsMasterRunningRequest()).getIsMasterRunning()) {
           return tryMaster;
         } else {
-          HBaseClientRPC.stopProxy(tryMaster);
+          rpcEngine.stopProxy(tryMaster);
           String msg = "Can create a proxy to master, but it is not running";
           LOG.info(msg);
           throw new MasterNotRunningException(msg);
@@ -1364,7 +1370,6 @@ public class HConnectionManager {
      * @param hostname
      * @param port
      * @param protocolClass
-     * @param version
      * @return Proxy.
      * @throws IOException
      */
@@ -1397,8 +1402,7 @@ public class HConnectionManager {
               // Only create isa when we need to.
               InetSocketAddress address = new InetSocketAddress(hostname, port);
               // definitely a cache miss. establish an RPC for this RS
-              server = HBaseClientRPC.waitForProxy(
-                  protocolClass, address, this.conf,
+              server = HBaseClientRPC.waitForProxy(rpcEngine, protocolClass, address, this.conf,
                   this.maxRPCAttempts, this.rpcTimeout, this.rpcTimeout);
               protocols.put(protocol, server);
             } catch (RemoteException e) {
@@ -1612,7 +1616,7 @@ public class HConnectionManager {
       synchronized (masterAndZKLock) {
         if (!isKeepAliveMasterConnectedAndRunning(protocolState)) {
           if (protocolState.protocol != null) {
-            HBaseClientRPC.stopProxy(protocolState.protocol);
+            rpcEngine.stopProxy(protocolState.protocol);
           }
           protocolState.protocol = null;
           protocolState.protocol = createMasterWithRetries(protocolState);
@@ -1688,7 +1692,7 @@ public class HConnectionManager {
     private void closeMasterProtocol(MasterProtocolState protocolState) {
       if (protocolState.protocol != null){
         LOG.info("Closing master protocol: " + protocolState.protocolClass.getName());
-        HBaseClientRPC.stopProxy(protocolState.protocol);
+        rpcEngine.stopProxy(protocolState.protocol);
         protocolState.protocol = null;
       }
       protocolState.userCount = 0;
@@ -2305,6 +2309,8 @@ public class HConnectionManager {
       return refCount == 0;
     }
 
+    /* TODO: Does the stopProxy flag even apply if RpcClientEngine is handled as an instance?
+     * Would this be better handled with a RpcClientEngine.close() method? */
     void close(boolean stopProxy) {
       if (this.closed) {
         return;
@@ -2314,7 +2320,7 @@ public class HConnectionManager {
         closeMaster();
         for (Map<String, IpcProtocol> i : servers.values()) {
           for (IpcProtocol server: i.values()) {
-            HBaseClientRPC.stopProxy(server);
+            rpcEngine.stopProxy(server);
           }
         }
       }
@@ -2418,6 +2424,14 @@ public class HConnectionManager {
         }
       }
       throw new TableNotFoundException(Bytes.toString(tableName));
+    }
+
+    /**
+     * Override the RpcClientEngine implementation used by this connection.
+     * <strong>FOR TESTING PURPOSES ONLY!</strong>
+     */
+    void setRpcEngine(RpcClientEngine engine) {
+      this.rpcEngine = engine;
     }
   }
 

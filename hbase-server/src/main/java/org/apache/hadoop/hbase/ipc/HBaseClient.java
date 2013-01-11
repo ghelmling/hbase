@@ -1250,6 +1250,17 @@ public class HBaseClient {
     return socketFactory;
   }
 
+  /**
+   * Free a reference to the client by an invocation handler
+   * A RPC client is closed only when its reference count becomes zero.
+   */
+  public synchronized void release() {
+    decCount();
+    if (isZeroReference()) {
+      stop();
+    }
+  }
+
   /** Stop all threads related to this client.  No further calls may be made
    * using this client. */
   public void stop() {

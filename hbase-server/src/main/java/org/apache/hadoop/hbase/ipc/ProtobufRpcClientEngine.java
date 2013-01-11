@@ -45,19 +45,20 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
   private static final Log LOG =
       LogFactory.getLog("org.apache.hadoop.hbase.ipc.ProtobufRpcClientEngine");
 
-  ProtobufRpcClientEngine() {
-    super();
+  protected Configuration conf;
+  protected HBaseClient client;
+
+  public ProtobufRpcClientEngine(Configuration conf) {
+    this.conf = conf;
+    this.client = new HBaseClient(conf);
   }
 
-  protected final static ClientCache CLIENTS = new ClientCache();
   @Override
-  public IpcProtocol getProxy(
-      Class<? extends IpcProtocol> protocol,
-      InetSocketAddress addr, User ticket, Configuration conf,
-      SocketFactory factory, int rpcTimeout) throws IOException {
-    final Invoker invoker = new Invoker(protocol, addr, ticket, conf, factory,
-        rpcTimeout);
-    return (IpcProtocol) Proxy.newProxyInstance(
+  public <T extends IpcProtocol> T getProxy(
+      Class<T> protocol, InetSocketAddress addr,
+      Configuration conf, int rpcTimeout) throws IOException {
+    final Invoker invoker = new Invoker(protocol, addr, User.getCurrent(), rpcTimeout, client);
+    return (T) Proxy.newProxyInstance(
         protocol.getClassLoader(), new Class[]{protocol}, invoker);
   }
 
@@ -66,6 +67,11 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
     if (proxy!=null) {
       ((Invoker)Proxy.getInvocationHandler(proxy)).close();
     }
+  }
+
+  // ref counting in HBaseClient shouldn't be needed, since we're also doing it in HConnection
+  public void close() {
+    this.client.stop();
   }
 
   static class Invoker implements InvocationHandler {
@@ -78,13 +84,12 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
     private boolean isClosed = false;
     final private int rpcTimeout;
 
-    public Invoker(Class<? extends IpcProtocol> protocol,
-                   InetSocketAddress addr, User ticket, Configuration conf,
-                   SocketFactory factory, int rpcTimeout) throws IOException {
+    public Invoker(Class<? extends IpcProtocol> protocol, InetSocketAddress addr, User ticket,
+        int rpcTimeout, HBaseClient client) throws IOException {
       this.protocol = protocol;
       this.address = addr;
       this.ticket = ticket;
-      this.client = CLIENTS.getClient(conf, factory);
+      this.client = client;
       this.rpcTimeout = rpcTimeout;
     }
 
@@ -160,7 +165,7 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
     synchronized protected void close() {
       if (!isClosed) {
         isClosed = true;
-        CLIENTS.stopClient(client);
+        client.release();
       }
     }
 
