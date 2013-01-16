@@ -1162,7 +1162,7 @@ public class HBaseAdmin implements Abortable, Closeable {
       CloseRegionResponse response = admin.closeRegion(null, request);
       boolean isRegionClosed = response.getClosed();
       if (false == isRegionClosed) {
-        LOG.error("Not able to close the region " + encodedRegionName + ".");
+        LOG.error("Not able to internalClose the region " + encodedRegionName + ".");
       }
       return isRegionClosed;
     } catch (ServiceException se) {

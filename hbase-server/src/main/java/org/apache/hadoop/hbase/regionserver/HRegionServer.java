@@ -998,9 +998,9 @@ public class  HRegionServer implements ClientProtocol,
 
     // Make sure the proxy is down.
     if (this.hbaseMaster != null) {
-      rpcClientEngine.stopProxy(this.hbaseMaster);
       this.hbaseMaster = null;
     }
+    this.rpcClientEngine.close();
     this.leases.close();
 
     if (!killed) {

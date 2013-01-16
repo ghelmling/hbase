@@ -62,13 +62,6 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
         protocol.getClassLoader(), new Class[]{protocol}, invoker);
   }
 
-  @Override
-  public void stopProxy(IpcProtocol proxy) {
-    if (proxy!=null) {
-      ((Invoker)Proxy.getInvocationHandler(proxy)).close();
-    }
-  }
-
   // ref counting in HBaseClient shouldn't be needed, since we're also doing it in HConnection
   public void close() {
     this.client.stop();
@@ -159,13 +152,6 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
           throw new ServiceException(cause);
         }
         throw new ServiceException(e);
-      }
-    }
-
-    synchronized protected void close() {
-      if (!isClosed) {
-        isClosed = true;
-        client.release();
       }
     }
 

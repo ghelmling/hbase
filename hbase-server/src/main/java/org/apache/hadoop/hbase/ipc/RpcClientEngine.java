@@ -34,9 +34,6 @@ public interface RpcClientEngine {
   <T extends IpcProtocol> T getProxy(Class<T> protocol, InetSocketAddress addr,
       Configuration conf, int rpcTimeout) throws IOException;
 
-  /** Stop this proxy. */
-  void stopProxy(IpcProtocol proxy);
-
   /** Shutdown this instance */
   void close();
 }
