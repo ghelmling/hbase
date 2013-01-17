@@ -45,11 +45,9 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
   private static final Log LOG =
       LogFactory.getLog("org.apache.hadoop.hbase.ipc.ProtobufRpcClientEngine");
 
-  protected Configuration conf;
   protected HBaseClient client;
 
   public ProtobufRpcClientEngine(Configuration conf) {
-    this.conf = conf;
     this.client = new HBaseClient(conf);
   }
 
@@ -62,7 +60,7 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
         protocol.getClassLoader(), new Class[]{protocol}, invoker);
   }
 
-  // ref counting in HBaseClient shouldn't be needed, since we're also doing it in HConnection
+  @Override
   public void close() {
     this.client.stop();
   }
@@ -74,7 +72,6 @@ public class ProtobufRpcClientEngine implements RpcClientEngine {
     private InetSocketAddress address;
     private User ticket;
     private HBaseClient client;
-    private boolean isClosed = false;
     final private int rpcTimeout;
 
     public Invoker(Class<? extends IpcProtocol> protocol, InetSocketAddress addr, User ticket,

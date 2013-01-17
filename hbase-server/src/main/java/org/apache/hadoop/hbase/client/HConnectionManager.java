@@ -2299,6 +2299,7 @@ public class HConnectionManager {
       closeMaster();
       closeZooKeeperWatcher();
       this.servers.clear();
+      this.rpcEngine.close();
       this.closed = true;
     }
 
