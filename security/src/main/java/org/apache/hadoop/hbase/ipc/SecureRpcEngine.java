@@ -65,6 +65,10 @@ public class SecureRpcEngine implements RpcEngine {
     if (User.isHBaseSecurityEnabled(conf)) {
       HBaseSaslRpcServer.init(conf);
     }
+    // check for an already created client
+    if (this.client != null) {
+      this.client.stop();
+    }
     this.client = new SecureClient(HbaseObjectWritable.class, conf);
   }
 

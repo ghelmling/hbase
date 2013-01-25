@@ -216,6 +216,23 @@ public class HConnectionManager {
    * @param conf
    *          configuration whose identity is used to find {@link HConnection}
    *          instance.
+   * @param stopProxy
+   *          No longer used.  This parameter is ignored.
+   * @deprecated use {@link #createConnection(org.apache.hadoop.conf.Configuration)} instead
+   */
+  @Deprecated
+  public static void deleteConnection(Configuration conf, boolean stopProxy) {
+    deleteConnection(conf);
+  }
+
+  /**
+   * Delete connection information for the instance specified by configuration.
+   * If there are no more references to it, this will then close connection to
+   * the zookeeper ensemble and let go of all resources.
+   *
+   * @param conf
+   *          configuration whose identity is used to find {@link HConnection}
+   *          instance.
    */
   public static void deleteConnection(Configuration conf) {
     deleteConnection(new HConnectionKey(conf), false);
@@ -230,6 +247,16 @@ public class HConnectionManager {
    */
   public static void deleteStaleConnection(HConnection connection) {
     deleteConnection(connection, true);
+  }
+
+  /**
+   * Delete information for all connections.
+   * @param stopProxy No longer used.  This parameter is ignored.
+   * @deprecated use {@link #deleteAllConnections()} instead
+   */
+  @Deprecated
+  public static void deleteAllConnections(boolean stopProxy) {
+    deleteAllConnections();
   }
 
   /**

@@ -101,6 +101,10 @@ class WritableRpcEngine implements RpcEngine {
   @Override
   public void setConf(Configuration config) {
     this.conf = config;
+    // check for an already created client
+    if (this.client != null) {
+      this.client.stop();
+    }
     this.client = new HBaseClient(HbaseObjectWritable.class, conf);
   }
 
