@@ -627,20 +627,20 @@ public class HConnectionManager {
     }
 
     private String clusterId = null;
+
     public final void retrieveClusterId(){
-      if (conf.get(HConstants.CLUSTER_ID) != null){
+      clusterId = conf.get(HConstants.CLUSTER_ID);
+
+      if (clusterId != null && !clusterId.isEmpty()) {
         return;
       }
 
       // No synchronized here, worse case we will retrieve it twice, that's
       //  not an issue.
-      if (this.clusterId == null){
-        this.clusterId = conf.get(HConstants.CLUSTER_ID);
-        if (this.clusterId == null) {
           ZooKeeperKeepAliveConnection zkw = null;
           try {
             zkw = getKeepAliveZooKeeperWatcher();
-            this.clusterId = ZKClusterId.readClusterIdZNode(zkw);
+        clusterId = ZKClusterId.readClusterIdZNode(zkw);
             if (clusterId == null) {
               LOG.info("ClusterId read in ZooKeeper is null");
             }
@@ -653,14 +653,11 @@ public class HConnectionManager {
               zkw.close();
             }
           }
-          if (this.clusterId == null) {
-            this.clusterId = "default";
+      if (clusterId == null) {
+        clusterId = "default";
           }
 
           LOG.info("ClusterId is " + clusterId);
-        }
-      }
-
       conf.set(HConstants.CLUSTER_ID, clusterId);
     }
 
