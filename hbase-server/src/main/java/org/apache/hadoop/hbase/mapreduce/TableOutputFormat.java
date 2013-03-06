@@ -194,9 +194,6 @@ implements Configurable {
     String serverImpl = this.conf.get(REGION_SERVER_IMPL);
 
     try {
-      // reset peer cluster's clusterId for token authentication to work
-      this.conf.set(HConstants.CLUSTER_ID, "");
-
       if (address != null) {
         ZKUtil.applyClusterKeyToConf(this.conf, address);
       }

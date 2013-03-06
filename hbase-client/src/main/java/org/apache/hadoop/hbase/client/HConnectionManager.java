@@ -615,7 +615,7 @@ public class HConnectionManager {
       // ProtobufRpcClientEngine is the main RpcClientEngine implementation,
       // but we maintain access through an interface to allow overriding for tests
       // RPC engine setup must follow obtaining the cluster ID for token authentication to work
-      this.rpcEngine = new ProtobufRpcClientEngine(this.conf);
+      this.rpcEngine = new ProtobufRpcClientEngine(this.conf, this.clusterId);
     }
 
     /**
@@ -629,36 +629,33 @@ public class HConnectionManager {
     private String clusterId = null;
 
     public final void retrieveClusterId(){
-      clusterId = conf.get(HConstants.CLUSTER_ID);
-
-      if (clusterId != null && !clusterId.isEmpty()) {
+      if (clusterId != null) {
         return;
       }
 
       // No synchronized here, worse case we will retrieve it twice, that's
       //  not an issue.
-          ZooKeeperKeepAliveConnection zkw = null;
-          try {
-            zkw = getKeepAliveZooKeeperWatcher();
+      ZooKeeperKeepAliveConnection zkw = null;
+      try {
+        zkw = getKeepAliveZooKeeperWatcher();
         clusterId = ZKClusterId.readClusterIdZNode(zkw);
-            if (clusterId == null) {
-              LOG.info("ClusterId read in ZooKeeper is null");
-            }
-          } catch (KeeperException e) {
-            LOG.warn("Can't retrieve clusterId from Zookeeper", e);
-          } catch (IOException e) {
-            LOG.warn("Can't retrieve clusterId from Zookeeper", e);
-          } finally {
-            if (zkw != null) {
-              zkw.close();
-            }
-          }
+        if (clusterId == null) {
+          LOG.info("ClusterId read in ZooKeeper is null");
+        }
+      } catch (KeeperException e) {
+        LOG.warn("Can't retrieve clusterId from Zookeeper", e);
+      } catch (IOException e) {
+        LOG.warn("Can't retrieve clusterId from Zookeeper", e);
+      } finally {
+        if (zkw != null) {
+          zkw.close();
+        }
+      }
       if (clusterId == null) {
-        clusterId = "default";
-          }
+        clusterId = HConstants.CLUSTER_ID_DEFAULT;
+      }
 
-          LOG.info("ClusterId is " + clusterId);
-      conf.set(HConstants.CLUSTER_ID, clusterId);
+      LOG.info("ClusterId is " + clusterId);
     }
 
     @Override
