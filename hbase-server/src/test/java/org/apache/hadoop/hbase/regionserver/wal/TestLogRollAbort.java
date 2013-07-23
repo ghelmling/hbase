@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hbase.regionserver.wal;
 
+import java.io.IOException;
+
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -154,13 +157,16 @@ public class TestLogRollAbort {
     LOG.info("Restarted datanodes");
 
     assertTrue("Should have an outstanding WAL edit", ((FSHLog) log).hasDeferredEntries());
+    FailedLogCloseException thrown = null;
     try {
       log.rollWriter(true);
       fail("Log roll should have triggered FailedLogCloseException");
     } catch (FailedLogCloseException flce) {
+      thrown = flce;
       assertTrue("Should have deferred flush log edits outstanding",
           ((FSHLog) log).hasDeferredEntries());
     }
+    assertNotNull("Log roll should have triggered FailedLogCloseException", thrown);
   }
 
 }
