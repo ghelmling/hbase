@@ -80,6 +80,7 @@ import org.apache.hadoop.hbase.Server;
 import org.apache.hadoop.hbase.TableName;
 import org.apache.hadoop.hbase.client.Operation;
 import org.apache.hadoop.hbase.codec.Codec;
+import org.apache.hadoop.hbase.conf.ConfigurationObserver;
 import org.apache.hadoop.hbase.exceptions.RegionMovedException;
 import org.apache.hadoop.hbase.io.ByteBufferOutputStream;
 import org.apache.hadoop.hbase.io.BoundedByteBufferPool;
@@ -155,7 +156,7 @@ import com.google.protobuf.TextFormat;
  */
 @InterfaceAudience.LimitedPrivate({HBaseInterfaceAudience.COPROC, HBaseInterfaceAudience.PHOENIX})
 @InterfaceStability.Evolving
-public class RpcServer implements RpcServerInterface {
+public class RpcServer implements RpcServerInterface, ConfigurationObserver {
   // LOG is being used in CallRunner and the log level is being changed in tests
   public static final Log LOG = LogFactory.getLog(RpcServer.class);
   private static final CallQueueTooBigException CALL_QUEUE_TOO_BIG_EXCEPTION
@@ -281,7 +282,7 @@ public class RpcServer implements RpcServerInterface {
 
   private final BoundedByteBufferPool reservoir;
 
-  private boolean allowFallbackToSimpleAuth;
+  private volatile boolean allowFallbackToSimpleAuth;
 
   /**
    * Datastructure that holds all necessary to a method invocation and then afterward, carries
@@ -2036,7 +2037,19 @@ public class RpcServer implements RpcServerInterface {
     if (isSecurityEnabled) {
       HBaseSaslRpcServer.init(conf);
     }
-    this.allowFallbackToSimpleAuth = conf.getBoolean(FALLBACK_TO_INSECURE_CLIENT_AUTH, false);
+    initReconfigurable(conf);
+
+    this.scheduler = scheduler;
+    this.scheduler.init(new RpcSchedulerContext(this));
+  }
+
+  @Override
+  public void onConfigurationChange(Configuration newConf) {
+    initReconfigurable(newConf);
+  }
+
+  private void initReconfigurable(Configuration confToLoad) {
+    this.allowFallbackToSimpleAuth = confToLoad.getBoolean(FALLBACK_TO_INSECURE_CLIENT_AUTH, false);
     if (isSecurityEnabled && allowFallbackToSimpleAuth) {
       LOG.warn("********* WARNING! *********");
       LOG.warn("This server is configured to allow connections from INSECURE clients");
@@ -2047,9 +2060,6 @@ public class RpcServer implements RpcServerInterface {
       LOG.warn("by setting " + FALLBACK_TO_INSECURE_CLIENT_AUTH + " = false in hbase-site.xml");
       LOG.warn("****************************");
     }
-
-    this.scheduler = scheduler;
-    this.scheduler.init(new RpcSchedulerContext(this));
   }
 
   /**
