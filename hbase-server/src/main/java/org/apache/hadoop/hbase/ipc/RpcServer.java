@@ -1528,6 +1528,7 @@ public class RpcServer implements RpcServerInterface, ConfigurationObserver {
       }
       if (isSecurityEnabled && authMethod == AuthMethod.SIMPLE) {
         if (allowFallbackToSimpleAuth) {
+          metrics.authenticationFallback();
           if (LOG.isTraceEnabled()) {
             LOG.trace("Falling back to SIMPLE auth for connection from " + getHostAddress());
           }
