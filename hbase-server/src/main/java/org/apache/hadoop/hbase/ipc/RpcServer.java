@@ -167,6 +167,12 @@ public class RpcServer implements RpcServerInterface {
   public static final byte CURRENT_VERSION = 0;
 
   /**
+   * Whether we allow a fallback to SIMPLE auth for insecure clients when security is enabled.
+   */
+  public static final String FALLBACK_TO_INSECURE_CLIENT_AUTH =
+          "hbase.ipc.server.fallback-to-simple-auth-allowed";
+
+  /**
    * How many calls/handler are allowed in the queue.
    */
   static final int DEFAULT_MAX_CALLQUEUE_LENGTH_PER_HANDLER = 10;
@@ -275,6 +281,7 @@ public class RpcServer implements RpcServerInterface {
 
   private final BoundedByteBufferPool reservoir;
 
+  private boolean allowFallbackToSimpleAuth;
 
   /**
    * Datastructure that holds all necessary to a method invocation and then afterward, carries
@@ -1519,10 +1526,16 @@ public class RpcServer implements RpcServerInterface {
         return doBadPreambleHandling(msg, new BadAuthException(msg));
       }
       if (isSecurityEnabled && authMethod == AuthMethod.SIMPLE) {
-        AccessDeniedException ae = new AccessDeniedException("Authentication is required");
-        setupResponse(authFailedResponse, authFailedCall, ae, ae.getMessage());
-        responder.doRespond(authFailedCall);
-        throw ae;
+        if (allowFallbackToSimpleAuth) {
+          if (LOG.isTraceEnabled()) {
+            LOG.trace("Falling back to SIMPLE auth for connection from " + getHostAddress());
+          }
+        } else {
+          AccessDeniedException ae = new AccessDeniedException("Authentication is required");
+          setupResponse(authFailedResponse, authFailedCall, ae, ae.getMessage());
+          responder.doRespond(authFailedCall);
+          throw ae;
+        }
       }
       if (!isSecurityEnabled && authMethod != AuthMethod.SIMPLE) {
         doRawSaslReply(SaslStatus.SUCCESS, new IntWritable(
@@ -2023,6 +2036,18 @@ public class RpcServer implements RpcServerInterface {
     if (isSecurityEnabled) {
       HBaseSaslRpcServer.init(conf);
     }
+    this.allowFallbackToSimpleAuth = conf.getBoolean(FALLBACK_TO_INSECURE_CLIENT_AUTH, false);
+    if (isSecurityEnabled && allowFallbackToSimpleAuth) {
+      LOG.warn("********* WARNING! *********");
+      LOG.warn("This server is configured to allow connections from INSECURE clients");
+      LOG.warn("(" + FALLBACK_TO_INSECURE_CLIENT_AUTH + " = true).");
+      LOG.warn("While this option is enabled, client identities cannot be secured, and user");
+      LOG.warn("impersonation is possible!");
+      LOG.warn("For secure operation, please disable SIMPLE authentication as soon as possible,");
+      LOG.warn("by setting " + FALLBACK_TO_INSECURE_CLIENT_AUTH + " = false in hbase-site.xml");
+      LOG.warn("****************************");
+    }
+
     this.scheduler = scheduler;
     this.scheduler.init(new RpcSchedulerContext(this));
   }
